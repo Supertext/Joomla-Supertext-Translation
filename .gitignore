@@ -1,0 +1,6 @@
+/vendor/
+/dist/
+/.phpunit.cache/
+/tests/docs/node_modules
+/tests/docs/package-lock.json
+.DS_Store

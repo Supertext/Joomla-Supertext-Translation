@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="plugin" group="console" method="upgrade">
+	<name>Console - Supertext demo setup</name>
+	<author>Supertext AG</author>
+	<creationDate>2026-10</creationDate>
+	<copyright>(C) Supertext AG</copyright>
+	<license>GNU General Public License version 2 or later; see LICENSE</license>
+	<version>0.1.0</version>
+	<description>Demo only: php cli/joomla.php supertext:demo-setup creates demo accounts, languages and sample content.</description>
+	<namespace path="src">Supertext\Plugin\Console\SupertextDemo</namespace>
+	<files>
+		<folder plugin="supertextdemo">services</folder>
+		<folder>src</folder>
+	</files>
+</extension>

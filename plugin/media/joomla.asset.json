@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
+  "name": "plg_system_supertext",
+  "version": "0.1.0",
+  "description": "Supertext translation dialog",
+  "license": "GPL-2.0-or-later",
+  "assets": [
+    {
+      "name": "plg_system_supertext.dialog",
+      "type": "script",
+      "uri": "plg_system_supertext/supertext.js",
+      "dependencies": ["core"],
+      "attributes": { "defer": true }
+    },
+    {
+      "name": "plg_system_supertext.dialog",
+      "type": "style",
+      "uri": "plg_system_supertext/supertext.css"
+    }
+  ]
+}

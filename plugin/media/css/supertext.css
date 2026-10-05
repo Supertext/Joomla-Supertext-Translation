@@ -1,0 +1,25 @@
+.supertext-dialog {
+  width: min(560px, calc(100vw - 2rem));
+  padding: 0;
+  border: 0;
+  border-radius: .5rem;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, .3);
+  color: var(--body-color, #22262a);
+  background: var(--body-bg, #fff);
+}
+.supertext-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.supertext-dialog header,
+.supertext-dialog footer {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem 1rem;
+}
+.supertext-dialog header { justify-content: space-between; border-bottom: 1px solid var(--border-color, #dee2e6); }
+.supertext-dialog header h2 { margin: 0; font-size: 1.15rem; }
+.supertext-dialog footer { justify-content: flex-end; border-top: 1px solid var(--border-color, #dee2e6); }
+.supertext-dialog .supertext-body { padding: 1rem; max-height: 65vh; overflow: auto; }
+.supertext-dialog fieldset legend { font-size: 1rem; font-weight: 600; }
+.supertext-dialog .form-check { margin-bottom: .35rem; }
+.supertext-dialog .badge { margin-inline-start: .35rem; font-weight: 500; }
+.supertext-dialog .supertext-results li { margin-bottom: .4rem; }

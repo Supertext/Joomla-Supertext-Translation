@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Lint
+        run: find plugin demo tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - run: composer install --no-interaction --no-progress
+      - run: composer test
+      - name: Demo entrypoint syntax
+        run: sh -n demo/entrypoint.sh
+      - run: ./build.sh
+
+  # Installs Joomla on PostgreSQL like the demo does, then translates the sample
+  # articles through the plugin against the stand-in API.
+  joomla:
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      JOOMLA_VERSION: 6.1.4
+      DEMO_ADMIN_EMAIL: admin@example.com
+      DEMO_ADMIN_PASSWORD: ci-admin-password-1
+      DEMO_EDITOR_EMAIL: editor@example.com
+      DEMO_EDITOR_PASSWORD: ci-editor-password-1
+      SUPERTEXT_API_KEY: Supertext-Auth-Key ci-key
+      SUPERTEXT_API_ENDPOINT: http://127.0.0.1:8765/v1/
+      PGPASSWORD: postgres
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pgsql, pdo_pgsql, intl, gd, zip
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start the stand-in API
+        run: nohup node tests/docs/stand-in.mjs > standin.log 2>&1 &
+      - name: Install Joomla
+        run: |
+          curl -fsSL -o joomla.zip "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip"
+          mkdir site && unzip -q joomla.zip -d site
+          psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE joomla'
+          php site/installation/joomla.php install -n --site-name=CI --admin-user=CI --admin-username=ci \
+            --admin-password=ci-installer-password --admin-email=ci@example.com \
+            --db-type=pgsql --db-host=127.0.0.1:5432 --db-user=postgres --db-pass=postgres --db-name=joomla --db-prefix=jos_
+          for tag in de-CH fr-FR it-IT; do
+            url=$(curl -fsSL "https://update.joomla.org/language/details6/${tag}_details.xml" | grep -o '<downloadurl[^>]*>[^<]*' | head -1 | sed 's/<[^>]*>//')
+            curl -fsSL -o "$tag.zip" "$url"
+            php site/cli/joomla.php extension:install --path="$PWD/$tag.zip" -n
+          done
+      - name: Install the plugin and the demo setup
+        run: |
+          ./build.sh
+          php site/cli/joomla.php extension:install --path="$PWD/dist/$(ls dist)" -n
+          (cd demo/plg_console_supertextdemo && zip -qr ../../demo-setup.zip .)
+          php site/cli/joomla.php extension:install --path="$PWD/demo-setup.zip" -n
+          id=$(php site/cli/joomla.php extension:list --type=plugin -n --no-ansi | grep "Supertext demo setup" | grep -oE ' [0-9]+ ' | head -1 | tr -d ' ')
+          php site/cli/joomla.php extension:enable "$id" -n
+          php site/cli/joomla.php supertext:demo-setup -n --remove-user=ci
+          php site/cli/joomla.php supertext:demo-setup -n   # second start: nothing changes
+      - name: Translate the sample articles
+        run: php site/cli/joomla.php supertext:translate 1 2 -n
+      - name: Check the German translation and its association
+        run: |
+          q() { psql -h 127.0.0.1 -U postgres -d joomla -tA -c "$1"; }
+          test "$(q "SELECT title FROM jos_content WHERE language='de-CH' AND title LIKE 'Schweizer%'")" = "Schweizer Schokolade, weltweit versandt"
+          q "SELECT \"fulltext\" FROM jos_content WHERE language='de-CH' AND title LIKE 'Schweizer%'" | grep -q '<strong>Berner</strong>'
+          test "$(q "SELECT COUNT(*) FROM jos_associations a JOIN jos_associations b ON a.key=b.key WHERE a.id=1 AND a.context='com_content.item'")" = "4"
+          test "$(q "SELECT COUNT(*) FROM jos_content WHERE state=0 AND language<>'en-GB'")" = "6"
+          test "$(q "SELECT COUNT(*) FROM jos_users")" = "2"
+      - name: Second run skips existing translations
+        run: php site/cli/joomla.php supertext:translate 1 -n | grep -c skipped | grep -q 3
+      - if: failure()
+        run: cat standin.log; tail -50 site/administrator/logs/*.php || true
