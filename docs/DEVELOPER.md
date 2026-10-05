@@ -113,7 +113,7 @@ CI (`.github/workflows/ci.yml`) on every push and pull request:
 
 ## Demo (Railway)
 
-The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
+The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production-096c.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
 
 **Deploys:** Railway watches `main` of this repository (`railway.json` points it at `demo/Dockerfile`) and rebuilds on every push.
 
