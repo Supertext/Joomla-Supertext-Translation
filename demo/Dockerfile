@@ -1,8 +1,8 @@
 # Supertext Joomla demo: Joomla 6.1 + German (CH), French and Italian + this plugin.
 # Build context is the repository root:
 #   docker build -f demo/Dockerfile -t supertext-joomla-demo .
-# The site (files) lives in /data (mount a volume there), the database in PostgreSQL
-# (DATABASE_URL). See docs/DEVELOPER.md -> Demo.
+# Everything persistent is in PostgreSQL (DATABASE_URL), including configuration.php;
+# the container keeps no files between deploys. See docs/DEVELOPER.md -> Demo.
 
 FROM php:8.3-apache
 
@@ -19,10 +19,11 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Joomla core and language packs, downloaded at build time.
-RUN mkdir -p /opt/joomla /opt/demo/languages \
+RUN mkdir -p /var/www/joomla /opt/demo/languages \
  && curl -fsSL -o /tmp/joomla.zip "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip" \
- && unzip -q /tmp/joomla.zip -d /opt/joomla && rm /tmp/joomla.zip \
- && cp /opt/joomla/htaccess.txt /opt/joomla/.htaccess \
+ && unzip -q /tmp/joomla.zip -d /var/www/joomla && rm /tmp/joomla.zip \
+ && cp /var/www/joomla/htaccess.txt /var/www/joomla/.htaccess \
+ && mv /var/www/joomla/installation /opt/demo/installation \
  && for tag in $JOOMLA_LANGUAGES; do \
       url=$(curl -fsSL "https://update.joomla.org/language/details6/${tag}_details.xml" | grep -o '<downloadurl[^>]*>[^<]*' | head -1 | sed 's/<[^>]*>//'); \
       curl -fsSL -o "/opt/demo/languages/${tag}.zip" "$url"; \
@@ -37,10 +38,9 @@ RUN cd /tmp/plugin && zip -qr /opt/demo/plg_system_supertext.zip . \
 
 COPY demo/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY demo/php.ini /usr/local/etc/php/conf.d/joomla.ini
-COPY demo/createdb.php /opt/demo/createdb.php
+COPY demo/createdb.php demo/state.php /opt/demo/
 COPY demo/entrypoint.sh /usr/local/bin/joomla-entrypoint
 RUN chmod +x /usr/local/bin/joomla-entrypoint
 
-# No VOLUME instruction: Railway rejects it and mounts its own volume at /data.
 ENTRYPOINT ["joomla-entrypoint"]
 CMD ["apache2-foreground"]

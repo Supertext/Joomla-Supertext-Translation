@@ -113,7 +113,7 @@ CI (`.github/workflows/ci.yml`) on every push and pull request:
 
 ## Demo (Railway)
 
-The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam). The database is a `joomla` database on the project's PostgreSQL service.
+The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
 
 **Deploys:** Railway watches `main` of this repository (`railway.json` points it at `demo/Dockerfile`) and rebuilds on every push.
 
@@ -121,14 +121,15 @@ The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with Eng
 
 | File | Purpose |
 | --- | --- |
-| `Dockerfile` | `php:8.3-apache` + extensions; downloads Joomla and the language packs at build time; packages this plugin and the demo setup plugin as zips |
-| `entrypoint.sh` | First boot: creates the database if missing, copies Joomla to `/data/www`, installs it (with a throwaway installer account) and the language packs. Every boot: installs/updates the plugin, then runs `supertext:demo-setup` |
+| `Dockerfile` | `php:8.3-apache` + extensions; downloads Joomla (into `/var/www/joomla`) and the language packs at build time; packages this plugin and the demo setup plugin as zips |
+| `entrypoint.sh` | First start (empty database): creates the database if missing and installs Joomla with a throwaway installer account. Every start: restores `configuration.php` from the database, installs the language packs, this plugin and the demo setup plugin, then runs `supertext:demo-setup` |
+| `state.php` | Saves/restores `configuration.php` in the table `supertext_demo_state` of the Joomla database |
 | `plg_console_supertextdemo/` | Demo-only console plugin: `supertext:demo-setup` (accounts, languages, Language Filter with associations, a home page per language, language switcher, sample articles; switches off the welcome tour and the statistics prompt) |
 | `createdb.php` | Creates the Joomla database on the server from `DATABASE_URL` |
 | `apache.conf`, `php.ini` | Web server and PHP settings |
 | `.env.example` | The variables below |
 
-**Persistent state:** the whole Joomla site lives on the Railway volume mounted at `/data` (`/data/www`), the content in PostgreSQL. A new image updates **the plugin** on the next boot, not Joomla itself (update Joomla from its backend, or reset the demo). To reset the demo, delete `/data/www` on the volume and drop the `joomla` database, then redeploy.
+**No volume:** Railway allows only three volumes per project and they are taken, so the container keeps no files. Everything that must survive a deploy is in PostgreSQL: the content, the plugin settings and `configuration.php` (in `supertext_demo_state`). Language packs and the plugins are reinstalled from the image on every start, which also updates the plugin. Consequences: media uploaded in the demo's backend disappear with the next deploy (the sample articles use Joomla's bundled images), and Joomla itself is updated by changing `JOOMLA_VERSION` in the `Dockerfile`, not from the backend (after a version change, run `php cli/joomla.php maintenance:database` once if Joomla reports database problems). To reset the demo, drop the `joomla` database and redeploy.
 
 **Service variables:**
 
@@ -142,13 +143,13 @@ The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with Eng
 | `JOOMLA_SITE_NAME`, `JOOMLA_DB_NAME`, `JOOMLA_DB_PREFIX` | Optional, first boot only |
 | `PORT` | Port Apache listens on (Railway sets it; the domain's target port must match) |
 
-**Demo accounts:** on every boot `supertext:demo-setup` creates the `DEMO_ADMIN` and `DEMO_EDITOR` accounts if no account with that e-mail address or username exists. Existing accounts are never changed; change passwords in the backend. Passwords must meet Joomla's rules (*Users → Options → Password Options*; by default at least 12 characters). If one doesn't, that account is skipped with a warning naming the variable and the rule; the demo still starts. Joomla's installer needs a Super User, so the first boot creates one with a random name and password that are never shown; it is deleted as soon as the `DEMO_ADMIN` account exists. Set `DEMO_ADMIN_*` before the first deploy (or add it later and redeploy). There is no web installer or "create admin" screen.
+**Demo accounts:** on every boot `supertext:demo-setup` creates the `DEMO_ADMIN` and `DEMO_EDITOR` accounts if no account with that e-mail address or username exists. Existing accounts are never changed; change passwords in the backend. Passwords must meet Joomla's rules (*Users → Options → Password Options*; by default at least 12 characters). If one doesn't, that account is skipped with a warning naming the variable and the rule; the demo still starts. Joomla's installer needs a Super User, so the first start creates one with a random name and password that are never shown; it is deleted as soon as the `DEMO_ADMIN` account exists. Set `DEMO_ADMIN_*` before the first deploy (or add it later and redeploy). There is no web installer or "create admin" screen.
 
 **Run it locally:**
 
 ```bash
 docker build -f demo/Dockerfile -t supertext-joomla-demo .
-docker run --rm -p 8080:80 -v joomlademo:/data \
+docker run --rm -p 8080:80 \
   -e DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/postgres \
   -e DEMO_ADMIN_EMAIL=you@example.com -e DEMO_ADMIN_PASSWORD='a-long-password-1' \
   -e SUPERTEXT_API_KEY=… supertext-joomla-demo
