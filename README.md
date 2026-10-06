@@ -21,7 +21,7 @@ Select articles, click **Supertext**, tick the languages and click **Translate**
 | [User guide](docs/USER_GUIDE.md) | Editors: translating, reviewing, what gets translated |
 | [Developer guide](docs/DEVELOPER.md) | Architecture, API protocol, local development, tests, demo deployment, releases |
 
-Quick start: build the package with `./build.sh` and install `dist/plg_system_supertext-<version>.zip` in *System → Install → Extensions*, then enter your API key in *System → Plugins → System - Supertext Translation*.
+Quick start: build the package with `./build.sh` and install `dist/plg_system_supertext-<version>.zip` in *System → Install → Extensions*, then enter your API key in *System → Plugins → System - Supertext Translation*. No Supertext account yet? [Create one](https://www.supertext.com/person/en/account/signin), then generate the key at [supertext.com → Integrations → API](https://www.supertext.com/en/integrations/api) (requires the Admin role).
 
 ## Demo
 

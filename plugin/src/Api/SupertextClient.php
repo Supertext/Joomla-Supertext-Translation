@@ -190,7 +190,7 @@ final class SupertextClient
     private function request(string $method, string $path, ?string $body = null, string $contentType = ''): array
     {
         if ($this->apiKey === '') {
-            throw new SupertextException('No Supertext API key is configured.');
+            throw new SupertextException('No Supertext API key is configured. Generate one at https://www.supertext.com/en/integrations/api (requires the Admin role).');
         }
 
         $headers = [
@@ -223,7 +223,7 @@ final class SupertextClient
         }
 
         $message = match (true) {
-            $code === 401, $code === 403 => 'Authentication failed. Please check the Supertext API key.',
+            $code === 401, $code === 403 => 'Authentication failed. Please check the Supertext API key. A new key can be generated at https://www.supertext.com/en/integrations/api (requires the Admin role).',
             $code === 404                => 'The requested Supertext resource was not found.',
             $code === 413                => 'The content is too large for Supertext to translate in one go.',
             $code === 429                => 'Too many requests to Supertext. Please try again shortly.',
