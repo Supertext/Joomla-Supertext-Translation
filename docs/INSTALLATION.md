@@ -19,7 +19,7 @@ A ready-to-run container with Joomla 6.1, English sample articles, German (Switz
 
 ## 1. Install the plugin
 
-The plugin isn't in the Joomla Extensions Directory yet. Build the package from this repository (or take it from a release):
+The plugin isn't in the Joomla Extensions Directory yet. Download `plg_system_supertext-<version>.zip` from the [Releases page](https://github.com/Supertext/Joomla-Supertext-Translation/releases), or build the package from this repository:
 
 ```bash
 ./build.sh            # creates dist/plg_system_supertext-<version>.zip

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+## 0.1.0 — 2026-10-07
+
 - The API key setting, the installation guide and the README now link to Supertext account sign-up and to *Integrations → API* to generate the key (Admin role required).
 - First version: Joomla system plugin `plg_system_supertext` (Joomla 6.1, PHP 8.3).
 - **Supertext** button in the Articles list (one or more articles) and the article editor; a dialog to pick target languages, with already translated languages marked and an explicit *Overwrite existing translations* option.
