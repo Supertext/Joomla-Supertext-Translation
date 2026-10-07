@@ -174,10 +174,16 @@ Start from a database without translations of the sample articles.
 
 ## Releasing
 
-1. Bump `<version>` in `plugin/supertext.xml` (and `media/joomla.asset.json`).
-2. Move the *Unreleased* entries in `CHANGELOG.md` under the new version.
-3. `./build.sh`, tag `vX.Y.Z` on `main`, attach `dist/plg_system_supertext-X.Y.Z.zip` to the GitHub release.
+Releases are published by `.github/workflows/release.yml` when the version is officially bumped; nobody tags or creates releases by hand.
 
+1. Check that `composer test` and `./build.sh` pass.
+2. Move the *Unreleased* entries in `CHANGELOG.md` under a new `## X.Y.Z — YYYY-MM-DD` section, and keep an empty *Unreleased* above it.
+3. Set the same version in:
+   - `plugin/supertext.xml`: `<version>`, shown in Joomla's extension manager
+   - `plugin/media/joomla.asset.json`: `version` of the web assets
+4. Push to `main`. The workflow checks that the version files match `CHANGELOG.md`, then tags `vX.Y.Z` and creates the GitHub release with the CHANGELOG section as notes (0.x versions as pre-releases). A push that adds no new version does nothing, and a version that is already released is skipped. After fixing a failed run, start it again with *Run workflow* on the *Release* workflow.
+
+The release attaches `plg_system_supertext-X.Y.Z.zip`, built by `./build.sh`.
 ## Conventions
 
 - Joomla coding standard (PSR-12 based), namespaced plugin structure (`services/provider.php`, `src/`), `\defined('_JEXEC') or die;` in files that use Joomla.
