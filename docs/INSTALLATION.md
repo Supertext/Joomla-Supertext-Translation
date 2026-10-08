@@ -92,6 +92,10 @@ php cli/joomla.php supertext:translate <article-id> --to=de-CH
 
 Anyone who can **edit** the source article can open the Supertext dialog. Creating a translation also needs **Create** permission in the category the translation goes into; updating an existing translation needs **Edit** (or *Edit Own*) on it. These are Joomla's normal article permissions (*Content → Articles → Options → Permissions*, or per category).
 
+## Interface languages
+
+The plugin's dialog, settings and messages are available in English, German (`de-DE` and `de-CH`), French (`fr-FR`) and Italian (`it-IT`). They follow each user's backend language: install the Joomla language pack (*System → Install → Languages*), then choose the language under *Users → Manage → (user) → Basic Settings → Backend Language*, or set the default under *System → Languages* (Administrator). Other backend languages show the English texts.
+
 ## All settings
 
 | Setting | Default | Purpose |

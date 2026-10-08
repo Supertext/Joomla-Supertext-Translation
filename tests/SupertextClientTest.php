@@ -92,6 +92,21 @@ final class SupertextClientTest extends TestCase
         self::assertGreaterThanOrEqual(2.0, SupertextClient::retryDelay(1));
     }
 
+    public function testGivesAReasonTheCmsCanTranslate(): void
+    {
+        $client = $this->client(fn () => ['status' => 418, 'body' => 'teapot']);
+
+        try {
+            $client->validateApiKey();
+            self::fail('Expected an exception');
+        } catch (SupertextException $e) {
+            self::assertSame('http_error', $e->reason);
+            self::assertSame([418], $e->args);
+            self::assertSame('teapot', $e->detail);
+            self::assertSame('Supertext answered with HTTP 418. (teapot)', $e->getMessage());
+        }
+    }
+
     public function testExplainsAuthenticationErrors(): void
     {
         $client = $this->client(fn () => ['status' => 401, 'body' => '{"detail":"bad key"}']);
@@ -116,6 +131,7 @@ final class SupertextClientTest extends TestCase
             self::fail('Expected an exception');
         } catch (SupertextException $e) {
             self::assertStringContainsString('limit is exceeded', $e->getMessage());
+            self::assertSame('limit_exceeded', $e->reason);
         }
 
         self::assertSame('DELETE', end($this->calls)['method']);

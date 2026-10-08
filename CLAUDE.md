@@ -23,6 +23,10 @@ Everywhere an administrator enters or is told about the API key — the settings
 
 Wording: "No Supertext account yet? Create one at supertext.com. Generate your API key at supertext.com → Integrations → API (requires the Admin role)." In the UI, links open in a new tab (`target="_blank" rel="noopener"`); where the CMS shows plain text only, use the bare URLs. New screens or messages that mention the key get the links too.
 
+## UI languages (always)
+
+The plugin's own UI (buttons, panels, dialogs, settings, permissions, messages) is available in English, German, French and Italian through the CMS's own translation mechanism, so it follows the user's back-end language. New or changed strings get all four languages in the same commit. Formal address (Sie, vous, Lei), the CMS's own terms in each language, "Supertext", placeholders and URLs never translated.
+
 ## Plugin list (always)
 
 `README.md` ends with the shared list of all Supertext plugins (between the `<!-- supertext-plugins:start -->` and `<!-- supertext-plugins:end -->` markers). It is identical in every Supertext plugin repo: when a plugin is added, renamed or its description changes, update the list in **all** repos, not just this one.
@@ -74,7 +78,7 @@ Lessons from the live API, apply them here: header `Authorization: Supertext-Aut
 
 - Before committing: `composer test`, PHP lint, `./build.sh`. CI also installs Joomla and runs a translation against the stand-in.
 - Test UI changes in a local Joomla with the plugin symlinked (see `docs/DEVELOPER.md` → Local development) and regenerate the screenshots they affect.
-- New settings go in `plugin/supertext.xml`, all three language files (`en-GB`, `de-DE`, `de-CH`) **and** the settings table in `docs/INSTALLATION.md`.
+- New settings go in `plugin/supertext.xml`, all five language files (`en-GB`, `de-DE`, `de-CH`, `fr-FR`, `it-IT`) **and** the settings table in `docs/INSTALLATION.md`.
 - Translated fields live in `plugin/src/Service/ArticleTranslator.php`; keep "What is translated" in `docs/DEVELOPER.md` and the lists in `docs/USER_GUIDE.md` in sync.
 - Keep `plugin/src/Api` free of Joomla classes (unit tests run without Joomla).
 - `demo/` is the Railway demo (`railway.json` → `demo/Dockerfile`, context = repo root). The demo-only setup lives in `demo/plg_console_supertextdemo`. Demo secrets live only in Railway variables.

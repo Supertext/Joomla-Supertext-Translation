@@ -2,6 +2,8 @@
 
 For editors. Once an administrator has set up the plugin (see [INSTALLATION.md](INSTALLATION.md)), you translate articles from the Joomla backend with one click. Supertext writes the translation; you review and publish it.
 
+The Supertext dialog and its messages appear in your Joomla backend language (English, German, French or Italian).
+
 ## Try it on the demo
 
 The Supertext Joomla demo (ask Supertext for the address and a backend login) has two English sample articles and German (Switzerland), French and Italian set up as languages. Translate an article as described below, then open it in the other language on the site.

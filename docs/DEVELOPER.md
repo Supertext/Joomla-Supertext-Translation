@@ -31,7 +31,8 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 | `Field\ConnectionField` | The *Test connection* button in the plugin settings. |
 | `Console\TranslateCommand` | `supertext:translate <ids>… [--to=tag]… [--overwrite] [--user=name]` |
 | `media/js/supertext.js`, `media/css/supertext.css`, `media/joomla.asset.json` | The dialog (native `<dialog>`, Joomla's Bootstrap classes); registered as web assets `plg_system_supertext.dialog`. |
-| `language/{en-GB,de-DE,de-CH}` | UI strings (plugin-local language files, loaded with `autoloadLanguage`). |
+| `language/{en-GB,de-DE,de-CH,fr-FR,it-IT}` | UI strings (plugin-local language files, loaded with `autoloadLanguage`). |
+| `Service\Messages` | Shows a `SupertextException` from the API client in the user's language (`PLG_SYSTEM_SUPERTEXT_API_<REASON>`), falling back to the client's English message. |
 
 ### What is translated
 
@@ -102,7 +103,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: API client (protocol, auth header, 429 retries, errors) and HtmlDocument
+composer test          # PHPUnit: API client (protocol, auth header, 429 retries, errors), HtmlDocument and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 
@@ -188,7 +189,8 @@ The release attaches `plg_system_supertext-X.Y.Z.zip`, built by `./build.sh`.
 
 - Joomla coding standard (PSR-12 based), namespaced plugin structure (`services/provider.php`, `src/`), `\defined('_JEXEC') or die;` in files that use Joomla.
 - Keep `src/Api` free of Joomla classes so it stays unit-testable.
-- User-visible strings in the language files (`en-GB`, `de-DE`, `de-CH`); messages from the API client are English.
+- User-visible strings in the language files: `plugin/language/{en-GB,de-DE,de-CH,fr-FR,it-IT}/plg_system_supertext.ini` (and `.sys.ini` for the extension manager). New or changed strings need English, German (both `de-DE` and `de-CH`: `ss` instead of `ß`, `«»` quotes), French and Italian in the same commit; `tests/LanguageFilesTest.php` checks that every file has the same keys, placeholders and URLs as `en-GB`. Formal address (Sie, vous, Lei) and Joomla's own terms in each language (*Beitrag*, *article*, *articolo*; *Versteckt*, *Dépublié*, *Non pubblicato*).
+- The API client (`src/Api`, no Joomla classes) throws `SupertextException` with an English message and a `reason` (e.g. `limit_exceeded`); `Service\Messages` shows the `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string instead. A new reason needs that string in all five files.
 - Keep the three docs in `docs/` current with every change (see `CLAUDE.md`).
 
 ## Known limitations / roadmap

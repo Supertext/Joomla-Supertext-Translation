@@ -26,6 +26,7 @@ use Supertext\Plugin\System\Supertext\Api\SupertextClient;
 use Supertext\Plugin\System\Supertext\Api\SupertextException;
 use Supertext\Plugin\System\Supertext\Console\TranslateCommand;
 use Supertext\Plugin\System\Supertext\Service\ArticleTranslator;
+use Supertext\Plugin\System\Supertext\Service\Messages;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -189,7 +190,7 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
             try {
                 array_push($results, ...$translator->translate($id, $targets, $overwrite, $user));
             } catch (\Throwable $e) {
-                $results[] = ['article' => $id, 'language' => '', 'status' => 'error', 'message' => $e->getMessage()];
+                $results[] = ['article' => $id, 'language' => '', 'status' => 'error', 'message' => Messages::of($e, $this->getApplication()->getLanguage())];
             }
         }
 
@@ -204,7 +205,11 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
             throw new SupertextException(Text::_('PLG_SYSTEM_SUPERTEXT_JS_NOT_CONFIGURED'));
         }
 
-        $client->validateApiKey();
+        try {
+            $client->validateApiKey();
+        } catch (SupertextException $e) {
+            throw new \RuntimeException(Messages::of($e, $this->getApplication()->getLanguage()), $e->getCode() ?: 500, $e);
+        }
 
         return ['ok' => true];
     }

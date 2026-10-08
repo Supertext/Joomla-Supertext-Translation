@@ -142,7 +142,7 @@ final class ArticleTranslator
                 $saved     = $this->translateInto($article, $tag, $existing ? (int) $existing->id : 0, $user);
                 $results[] = $result + ['status' => $existing ? 'updated' : 'created'] + $saved;
             } catch (\Throwable $e) {
-                $results[] = $result + ['status' => 'error', 'message' => $e->getMessage()];
+                $results[] = $result + ['status' => 'error', 'message' => Messages::of($e, $this->app->getLanguage())];
             }
         }
 
