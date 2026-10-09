@@ -13,7 +13,7 @@ jobs:
       matrix:
         php: ['8.2', '8.3', '8.4']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -49,13 +49,13 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: pgsql, pdo_pgsql, intl, gd, zip
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - name: Start the stand-in API
