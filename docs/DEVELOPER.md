@@ -110,6 +110,7 @@ composer test          # PHPUnit: API client (protocol, auth header, 429 retries
 CI (`.github/workflows/ci.yml`) on every push and pull request:
 
 - **unit**: PHP lint on 8.2, 8.3 and 8.4, PHPUnit, `sh -n demo/entrypoint.sh`, package build.
+- **PHPStan**: level 5 against a downloaded Joomla (see *Code quality and security checks*).
 - **joomla**: installs Joomla 6.1 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database.
 
 ## Demo (Railway)
@@ -172,6 +173,15 @@ BASE_URL=http://127.0.0.1:8092 DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… \
 ```
 
 Start from a database without translations of the sample articles.
+
+## Code quality and security checks
+
+- **Checks** workflow (`.github/workflows/checks.yml`): actionlint and zizmor lint the workflows on every push and pull request; dependency review fails a pull request that adds a package with a known vulnerability (moderate or worse). Third-party actions are pinned to commit SHAs (Dependabot keeps them current), the default token is read-only and checkouts don't keep credentials. Locally: `pip install actionlint-py zizmor`, then `actionlint` and `zizmor .github/workflows` in the repo root.
+- **Links** workflow (`.github/workflows/links.yml`): lychee checks all Markdown links weekly and whenever docs change on `main`. Broken links open (or update) the issue "Broken links in the docs". Links that can't work from CI (local URLs, placeholders, pages behind a login) are excluded in `.lycheeignore`.
+- **PHPStan** (job *PHPStan* in `.github/workflows/ci.yml`, config `phpstan.neon`; `phpstan/phpstan` is a dev dependency): level 5 over `plugin/src/` and `plugin/services/`, no baseline (nothing to baseline when it was introduced). Joomla isn't a Composer package, so the job downloads the Joomla full package (the version in the job's `JOOMLA_VERSION`) into `.joomla/` (git-ignored); `phpstan.neon` loads its `libraries/vendor/autoload.php` and scans `libraries/src` and the com_content and com_fields sources. Locally: unzip a `Joomla_X.Y.Z-Stable-Full_Package.zip` into `.joomla/`, then `composer install && vendor/bin/phpstan analyse`. If findings ever have to be accepted, put them in `phpstan-baseline.neon` (`--generate-baseline`) and include it from `phpstan.neon`.
+- **GitHub settings** (set by Remy's setup script, not in the repo): secret scanning with push protection (a push containing a known token format is rejected; findings under *Security → Secret scanning*) and CodeQL default setup (findings under *Security → Code scanning* and as pull request comments). CodeQL doesn't cover PHP, which is why this repo runs PHPStan.
+
+Before starting work in this repo, look at its open findings: code scanning alerts, secret scanning alerts, Dependabot pull requests and the issue "Broken links in the docs".
 
 ## Releasing
 
