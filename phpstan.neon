@@ -1,0 +1,15 @@
+# PHPStan: see docs/DEVELOPER.md → Code quality and security checks.
+# Needs a Joomla in .joomla/ (CI downloads the full package there; locally unzip
+# the Joomla_X.Y.Z-Stable-Full_Package.zip into .joomla/), then
+# `composer install && vendor/bin/phpstan analyse`.
+parameters:
+    level: 5
+    paths:
+        - plugin/src
+        - plugin/services
+    bootstrapFiles:
+        - .joomla/libraries/vendor/autoload.php
+    scanDirectories:
+        - .joomla/libraries/src
+        - .joomla/administrator/components/com_content/src
+        - .joomla/administrator/components/com_fields/src
