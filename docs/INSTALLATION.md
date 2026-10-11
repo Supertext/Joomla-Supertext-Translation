@@ -73,9 +73,9 @@ Articles must have a language of their own (not *All*) to be translated.
 
 ### Language codes and tone
 
-By default the content language's tag (e.g. `de-CH`, `fr-FR`) is sent to Supertext as the target language. On the plugin's **Languages** tab you can, per content language:
+By default the content language's tag (e.g. `de-CH`, `fr-FR`) is sent to Supertext as the target language, and the article's language without region (`en-GB` → `en`) as the source. On the plugin's **Languages** tab you can, per content language:
 
-- send a **different code**, e.g. `fr-CH` for Swiss French while the site uses the `fr-FR` language pack, and
+- send a **different code**, e.g. `fr-CH` for Swiss French while the site uses the `fr-FR` language pack (include the region: Supertext needs one for target languages, so a code without region gets a default, e.g. `fr` → `fr-FR`, `de` → `de-DE`; see the [developer guide](DEVELOPER.md#language-codes)), and
 - choose the **tone**: *Formal (Sie, vous)*, *Informal (du, tu)* or the Supertext default.
 
 <img src="images/plugin-languages.png" alt="Languages tab of the plugin: a row for French (fr-FR) with the Supertext language code fr-CH and the tone Formal (Sie, vous)" width="720">

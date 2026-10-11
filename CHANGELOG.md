@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Fixed: a *Supertext language code* without a region (e.g. `de`) is now sent as a regional code (`de-DE`, `fr-FR`, …), which Supertext requires for target languages, and codes are normalized (`de_ch` → `de-CH`). The source is always sent without region, also when its language has a Supertext code.
 - Added: French and Italian interface (`fr-FR`, `it-IT`), and German where it was missing: messages from Supertext (limit reached, authentication failed, timeouts and others) now appear in the user's backend language too. The "no API key" and "authentication failed" messages now also link to Supertext account sign-up.
 
 ## 0.1.0 — 2026-10-07

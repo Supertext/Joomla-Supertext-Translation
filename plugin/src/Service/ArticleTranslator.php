@@ -18,6 +18,7 @@ use Joomla\Database\DatabaseInterface;
 use Joomla\Database\ParameterType;
 use Joomla\Registry\Registry;
 use Supertext\Plugin\System\Supertext\Api\HtmlDocument;
+use Supertext\Plugin\System\Supertext\Api\LanguageCodes;
 use Supertext\Plugin\System\Supertext\Api\SupertextClient;
 use Supertext\Plugin\System\Supertext\Api\SupertextException;
 
@@ -299,7 +300,8 @@ final class ArticleTranslator
         }
 
         $settings   = $this->languageSettings[$tag] ?? [];
-        $code       = trim((string) ($settings['code'] ?? '')) ?: $tag;
+        $code       = LanguageCodes::target($tag, (string) ($settings['code'] ?? ''));
+        $source     = LanguageCodes::source($sourceTag, (string) ($this->languageSettings[$sourceTag]['code'] ?? ''));
         $politeness = (string) ($settings['politeness'] ?? 'default');
         $out        = [];
 
@@ -321,7 +323,7 @@ final class ArticleTranslator
 
         foreach ($chunks as $chunk) {
             $isHtml = array_map(static fn (array $s): bool => $s['html'], $chunk);
-            $html   = $this->client->translateDocument(HtmlDocument::build($chunk), $code, $sourceTag, $politeness);
+            $html   = $this->client->translateDocument(HtmlDocument::build($chunk), $code, $source, $politeness);
 
             foreach (HtmlDocument::parse($html, $isHtml) as $i => $translation) {
                 if (isset($keys[$i]) && trim(strip_tags($translation)) !== '') {

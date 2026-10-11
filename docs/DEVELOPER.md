@@ -27,6 +27,7 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 | `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables. |
 | `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, chunking (< 900k characters per document), writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
 | `Api\SupertextClient` | Supertext AI file translation API v1. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests). |
+| `Api\LanguageCodes` | Language code rules (bare source, regional target with defaults, override); no Joomla dependency. |
 | `Api\HtmlDocument` | Builds/parses the HTML document; wraps Joomla plugin tags (`{loadmodule …}`) in `<span translate="no">` and unwraps them afterwards. |
 | `Field\ConnectionField` | The *Test connection* button in the plugin settings. |
 | `Console\TranslateCommand` | `supertext:translate <ids>… [--to=tag]… [--overwrite] [--user=name]` |
@@ -57,7 +58,7 @@ Each field is one `<div data-st-id>`. The live API translates every such element
 
 Shared with the WordPress plugin and every other Supertext CMS plugin:
 
-1. `POST {base}translate/ai/file`: multipart with `file` (part `Content-Type` exactly `text/html`, no charset, or the API answers 415), `target_lang` (BCP-47, e.g. `de-CH`), optional `source_lang` (primary subtag only, e.g. `en`, or the pair is rejected), optional `politeness` (`more`/`less`). Returns `{file_id}`.
+1. `POST {base}translate/ai/file`: multipart with `file` (part `Content-Type` exactly `text/html`, no charset, or the API answers 415), `target_lang` (regional code, e.g. `de-CH`), optional `source_lang` (bare language, e.g. `en`, or the pair is rejected; see *Language codes*), optional `politeness` (`more`/`less`). Returns `{file_id}`.
 2. `GET …/{file_id}/status` until `done` (`error`, `limit_exceeded`, `deleted` are terminal).
 3. `GET …/{file_id}/translation` returns the translated HTML.
 4. `DELETE …/{file_id}` (files also expire after 24 h).
@@ -69,6 +70,16 @@ Auth header: `Authorization: Supertext-Auth-Key <key>`. The header name must be 
 **`translate="no"`** is respected by the API; the plugin uses it for Joomla plugin tags.
 
 The multipart body is built by hand (`SupertextClient::submit()`): `Joomla\Http`'s curl transport only sends arrays as multipart when you set the `Content-Type` yourself, and then curl adds no boundary.
+
+### Language codes
+
+Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Api\LanguageCodes` applies the rule; `ArticleTranslator::translateFields()` feeds it the article's and the target's content language tags and the *Supertext language code* from the plugin's Languages tab:
+
+- Source: the article's language tag (or its Supertext code) reduced to the language: `en-GB` → `en`.
+- Target: the Supertext code if set, otherwise the language tag. A code with a region keeps it, normalized (`de_ch` / `de-ch` → `de-CH`; scripts and numeric regions stay: `zh-Hant`, `es-419`). A bare code gets a regional default: ar→ar-SA, bg→bg-BG, cs→cs-CZ, da→da-DK, de→de-DE, el→el-GR, en→en-US, es→es-ES, et→et-EE, fi→fi-FI, fr→fr-FR, hr→hr-HR, hu→hu-HU, it→it-IT, ja→ja-JP, ko→ko-KR, lt→lt-LT, lv→lv-LV, nb→nb-NO, nl→nl-NL, pl→pl-PL, pt→pt-PT, ro→ro-RO, ru→ru-RU, sk→sk-SK, sl→sl-SI, sr→sr-RS, sv→sv-SE, th→th-TH, tr→tr-TR, uk→uk-UA, vi→vi-VN, zh→zh-CN (same table as the other Supertext plugins). Joomla's tags always have a region, so the default only applies to a bare Supertext code. Unknown bare codes are sent unchanged, so Supertext's error names them.
+- Translating within one language (source `en`, target `en-US`) is allowed.
+
+The stand-in (`tests/docs/stand-in.mjs`, also used by the CI job **joomla**) rejects bare targets and regional sources like the real API.
 
 ## Local development
 
@@ -103,7 +114,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: API client (protocol, auth header, 429 retries, errors), HtmlDocument and the language files
+composer test          # PHPUnit: API client (protocol, auth header, 429 retries, errors), language codes, HtmlDocument and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 

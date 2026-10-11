@@ -85,8 +85,8 @@ final class SupertextClient
     /**
      * Translates a complete HTML document and returns the translated HTML.
      *
-     * @param string $targetLanguage BCP-47 code, e.g. "de-CH"
-     * @param string $sourceLanguage any form ("en-GB"); only the primary subtag is sent. Empty: auto-detect.
+     * @param string $targetLanguage regional code, e.g. "de-CH" (see LanguageCodes::target())
+     * @param string $sourceLanguage any form ("en-GB"); only the bare language is sent. Empty: auto-detect.
      * @param string $politeness     "default", "more" (formal) or "less" (informal)
      */
     public function translateDocument(string $html, string $targetLanguage, string $sourceLanguage = '', string $politeness = 'default'): string
@@ -115,7 +115,7 @@ final class SupertextClient
     private function submit(string $html, string $targetLanguage, string $sourceLanguage, string $politeness): string
     {
         $fields = ['target_lang' => $targetLanguage];
-        $source = strtolower((string) strtok($sourceLanguage, '-_'));
+        $source = LanguageCodes::source($sourceLanguage);
 
         if ($source !== '') {
             // A full tag such as "en-GB" as source is rejected with INVALID_LANGUAGE_PAIR.

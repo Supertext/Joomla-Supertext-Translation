@@ -35,6 +35,10 @@ http
       const form = await new Request('http://x', { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) }).formData()
       const file = form.get('file')
       if (!file || file.type !== 'text/html') return send(415, { detail: 'FILETYPE_NOT_ALLOWED' })
+      // Like the real API: the target needs a region (de-DE), the source must be bare (en).
+      if (!/^[a-z]{2,3}-[A-Za-z0-9]{2,4}$/.test(form.get('target_lang') ?? '') || /[-_]/.test(form.get('source_lang') ?? '')) {
+        return send(400, { detail: `INVALID_LANGUAGE_PAIR: ${form.get('source_lang')} -> ${form.get('target_lang')}` })
+      }
       const id = randomBytes(6).toString('hex')
       files.set(id, { html: await file.text(), target: String(form.get('target_lang')) })
       return send(200, { file_id: id })
