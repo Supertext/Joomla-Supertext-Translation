@@ -8,6 +8,7 @@ parameters:
         - plugin/src
         - plugin/services
     bootstrapFiles:
+        - tests/phpstan/bootstrap.php
         - .joomla/libraries/vendor/autoload.php
     scanDirectories:
         - .joomla/libraries/src

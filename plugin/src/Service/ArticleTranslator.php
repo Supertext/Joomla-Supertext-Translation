@@ -12,6 +12,8 @@ use Joomla\CMS\Application\ApplicationHelper;
 use Joomla\CMS\Application\CMSApplicationInterface;
 use Joomla\CMS\Language\Associations;
 use Joomla\CMS\Language\LanguageHelper;
+use Joomla\CMS\MVC\Factory\MVCFactoryServiceInterface;
+use Joomla\CMS\MVC\Model\AdminModel;
 use Joomla\CMS\User\User;
 use Joomla\Component\Fields\Administrator\Helper\FieldsHelper;
 use Joomla\Database\DatabaseInterface;
@@ -266,8 +268,14 @@ final class ArticleTranslator
         unset($associations[$tag]);
         $data['associations'] = $associations;
 
-        $model = $this->app->bootComponent('com_content')->getMVCFactory()
-            ->createModel('Article', 'Administrator', ['ignore_request' => true]);
+        $component = $this->app->bootComponent('com_content');
+        $model     = $component instanceof MVCFactoryServiceInterface
+            ? $component->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true])
+            : null;
+
+        if (!$model instanceof AdminModel) {
+            throw new SupertextException($this->text('PLG_SYSTEM_SUPERTEXT_ERROR_SAVE'));
+        }
 
         if (!$model->save($data)) {
             throw new SupertextException($model->getError() ?: $this->text('PLG_SYSTEM_SUPERTEXT_ERROR_SAVE'));

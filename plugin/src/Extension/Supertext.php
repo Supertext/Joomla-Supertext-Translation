@@ -10,7 +10,9 @@ namespace Supertext\Plugin\System\Supertext\Extension;
 
 use Joomla\Application\ApplicationEvents;
 use Joomla\Application\Event\ApplicationEvent;
+use Joomla\CMS\Application\CMSWebApplicationInterface;
 use Joomla\CMS\Application\ConsoleApplication;
+use Joomla\CMS\Document\HtmlDocument;
 use Joomla\CMS\Event\Application\AfterDispatchEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
 use Joomla\CMS\Http\HttpFactory;
@@ -80,9 +82,13 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
             default                                      => '',
         };
 
+        if (!$app instanceof CMSWebApplicationInterface) {
+            return;
+        }
+
         $document = $app->getDocument();
 
-        if ($mode === '' || $document->getType() !== 'html' || !$app->getIdentity()?->authorise('core.manage', 'com_content')) {
+        if ($mode === '' || !$document instanceof HtmlDocument || !$app->getIdentity()?->authorise('core.manage', 'com_content')) {
             return;
         }
 
