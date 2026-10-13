@@ -127,6 +127,7 @@ Install the new package over the old one (*System → Install → Extensions*, o
 | *This article's language is "All"* | Give the article a specific language first. |
 | *… is not a content language of this site* | The language was removed or unpublished; check *Content Languages*. |
 | *You are not allowed to create articles in the category used for …* | The user lacks *Create* permission there (see *Who can translate*). |
+| *Supertext does not support this language pair (en → xx-YY)* | The content language (or its *Supertext language code* in the plugin settings) isn't one Supertext offers. Set a code such as `de-CH` or `fr`; the message shows the codes that were sent. |
 | *Too many requests to Supertext* | Supertext's per-second limit was still exceeded after 4 automatic retries. Wait a moment and translate again. |
 | *Your Supertext translation limit is exceeded* | Your Supertext plan's volume is used up. |
 | *Timed out waiting* | Very long articles: raise the *Timeout* (and PHP's `max_execution_time`). |

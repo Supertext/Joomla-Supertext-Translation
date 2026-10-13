@@ -87,4 +87,5 @@ Lessons from the live API, apply them here: header `Authorization: Supertext-Aut
 - New settings go in `plugin/supertext.xml`, all five language files (`en-GB`, `de-DE`, `de-CH`, `fr-FR`, `it-IT`) **and** the settings table in `docs/INSTALLATION.md`.
 - Translated fields live in `plugin/src/Service/ArticleTranslator.php`; keep "What is translated" in `docs/DEVELOPER.md` and the lists in `docs/USER_GUIDE.md` in sync.
 - Keep `plugin/src/Api` free of Joomla classes (unit tests run without Joomla).
+- All Supertext API calls go through the Supertext PHP SDK, shipped in `plugin/src/Sdk` with its namespace changed to `Supertext\Plugin\System\Supertext\Sdk` and wrapped by `plugin/src/Api/SupertextClient.php`. Never edit `plugin/src/Sdk`: fix the SDK in `Supertext/Supertext-API-SDK-and-Guide` and run `scripts/vendor-sdk.sh`. Every SDK error code needs a reason in `SupertextClient::REASONS` and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
 - `demo/` is the Railway demo (`railway.json` → `demo/Dockerfile`, context = repo root). The demo-only setup lives in `demo/plg_console_supertextdemo`. Demo secrets live only in Railway variables.

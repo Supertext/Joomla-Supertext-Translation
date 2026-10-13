@@ -305,30 +305,10 @@ final class ArticleTranslator
         $politeness = (string) ($settings['politeness'] ?? 'default');
         $out        = [];
 
-        // Chunk to stay below the per-document limit.
-        $chunks = [[]];
-        $size   = 0;
-
-        foreach ($segments as $i => $segment) {
-            $length = \strlen($segment['text']);
-
-            if ($size + $length > SupertextClient::MAX_DOCUMENT_CHARACTERS && $chunks[\count($chunks) - 1]) {
-                $chunks[] = [];
-                $size     = 0;
-            }
-
-            $chunks[\count($chunks) - 1][$i] = $segment;
-            $size += $length;
-        }
-
-        foreach ($chunks as $chunk) {
-            $isHtml = array_map(static fn (array $s): bool => $s['html'], $chunk);
-            $html   = $this->client->translateDocument(HtmlDocument::build($chunk), $code, $source, $politeness);
-
-            foreach (HtmlDocument::parse($html, $isHtml) as $i => $translation) {
-                if (isset($keys[$i]) && trim(strip_tags($translation)) !== '') {
-                    $out[$keys[$i]] = $translation;
-                }
+        // The Supertext SDK packs the segments into documents below the size limit.
+        foreach ($this->client->translateSegments($segments, $code, $source, $politeness) as $i => $translation) {
+            if (isset($keys[$i]) && trim(strip_tags($translation)) !== '') {
+                $out[$keys[$i]] = $translation;
             }
         }
 

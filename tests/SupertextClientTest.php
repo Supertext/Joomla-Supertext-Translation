@@ -146,6 +146,57 @@ final class SupertextClientTest extends TestCase
         $client->validateApiKey();
     }
 
+    public function testTranslatesSegmentsAndToleratesMissingOnes(): void
+    {
+        $client = $this->client(fn (string $method, string $url) => match (true) {
+            $method === 'POST'                  => ['status' => 200, 'body' => '{"file_id":"f1"}'],
+            str_ends_with($url, '/status')      => ['status' => 200, 'body' => '{"status":"done"}'],
+            str_ends_with($url, '/translation') => ['status' => 200, 'body' => '<div data-st-id="0">Hallo<br>Welt</div><div data-st-id="1"><p>Ein <b>Text</b></p></div>'],
+            default                             => ['status' => 200, 'body' => '{}'],
+        });
+
+        $result = $client->translateSegments([
+            3 => ['text' => "Hello\nworld", 'html' => false],
+            5 => ['text' => '<p>A <b>text</b></p>', 'html' => true],
+            7 => ['text' => '   ', 'html' => false],
+            9 => ['text' => 'Lost', 'html' => false],
+        ], 'de-CH', 'en');
+
+        self::assertSame([3 => "Hallo\nWelt", 5 => '<p>Ein <b>Text</b></p>'], $result);
+        self::assertStringContainsString('<div data-st-id="0">Hello<br>world</div>', (string) $this->calls[0]['body']);
+        self::assertStringContainsString('<div data-st-id="2">Lost</div>', (string) $this->calls[0]['body']);
+    }
+
+    public function testSplitsLargeContentIntoSeveralDocuments(): void
+    {
+        $posts = 0;
+        $client = $this->client(function (string $method, string $url) use (&$posts) {
+            return match (true) {
+                $method === 'POST'                  => ['status' => 200, 'body' => '{"file_id":"f' . ++$posts . '"}'],
+                str_ends_with($url, '/status')      => ['status' => 200, 'body' => '{"status":"done"}'],
+                str_ends_with($url, '/translation') => ['status' => 200, 'body' => '<div data-st-id="0">x</div>'],
+                default                             => ['status' => 200, 'body' => '{}'],
+            };
+        });
+
+        $client->translateSegments([['text' => str_repeat('a', 8), 'html' => false], ['text' => str_repeat('b', 8), 'html' => false]], 'de-DE', '', 'default', 10);
+
+        self::assertSame(2, $posts);
+    }
+
+    public function testReportsAnUnsupportedLanguagePair(): void
+    {
+        $client = $this->client(fn () => ['status' => 400, 'body' => '{"error_code":"INVALID_LANGUAGE_PAIR","source_lang":"en","target_lang":"xx-YY"}']);
+
+        try {
+            $client->translateDocument('<p>x</p>', 'xx-YY', 'en');
+            self::fail('Expected an exception');
+        } catch (SupertextException $e) {
+            self::assertSame('invalid_language_pair', $e->reason);
+            self::assertSame(['en', 'xx-YY'], $e->args);
+        }
+    }
+
     public function testEnvironments(): void
     {
         self::assertSame(SupertextClient::LIVE, SupertextClient::baseUrlFor('live'));

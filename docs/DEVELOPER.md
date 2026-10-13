@@ -15,8 +15,8 @@ Articles list / article editor                  php cli/joomla.php supertext:tra
         ▼                                                  ▼
 Extension\Supertext::handleAjax ──► Service\ArticleTranslator
    describe | translate | test         │ collects fields, one HTML document per article + language
-                                       │ Api\HtmlDocument   <div data-st-id="N"> per field
-                                       │ Api\SupertextClient POST file → poll → GET → DELETE
+                                       │ Api\SupertextClient (bundled Supertext SDK):
+                                       │   <div data-st-id="N"> per field, POST file → poll → GET → DELETE
                                        ▼
                          com_content ArticleModel::save()  (new or existing translation)
                          + data['associations']            (links source and all translations)
@@ -25,10 +25,11 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 | Class / file | Responsibility |
 | --- | --- |
 | `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables. |
-| `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, chunking (< 900k characters per document), writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
-| `Api\SupertextClient` | Supertext AI file translation API v1. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests). |
-| `Api\LanguageCodes` | Language code rules (bare source, regional target with defaults, override); no Joomla dependency. |
-| `Api\HtmlDocument` | Builds/parses the HTML document; wraps Joomla plugin tags (`{loadmodule …}`) in `<span translate="no">` and unwraps them afterwards. |
+| `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
+| `Api\SupertextClient` | Wrapper around the bundled Supertext SDK (`src/Sdk`): documents below 900k characters, protocol, retries; maps SDK error codes to reasons. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests; `Api\CallableTransport`). |
+| `Sdk\…` | Bundled copy of the Supertext PHP SDK, namespace `Supertext\Plugin\System\Supertext\Sdk` (see *Supertext SDK*). Never edit. |
+| `Api\LanguageCodes` | Language code rules from the SDK (bare source, regional target with defaults) plus the override; no Joomla dependency. |
+| `Api\HtmlDocument` | Wraps Joomla plugin tags (`{loadmodule …}`) in `<span translate="no">` and unwraps them afterwards. |
 | `Field\ConnectionField` | The *Test connection* button in the plugin settings. |
 | `Console\TranslateCommand` | `supertext:translate <ids>… [--to=tag]… [--overwrite] [--user=name]` |
 | `media/js/supertext.js`, `media/css/supertext.css`, `media/joomla.asset.json` | The dialog (native `<dialog>`, Joomla's Bootstrap classes); registered as web assets `plg_system_supertext.dialog`. |
@@ -56,7 +57,7 @@ Each field is one `<div data-st-id>`. The live API translates every such element
 
 ## Supertext API protocol
 
-Shared with the WordPress plugin and every other Supertext CMS plugin:
+Shared with every Supertext plugin. Every call goes through the Supertext SDK (see *Supertext SDK*); this is what it does:
 
 1. `POST {base}translate/ai/file`: multipart with `file` (part `Content-Type` exactly `text/html`, no charset, or the API answers 415), `target_lang` (regional code, e.g. `de-CH`), optional `source_lang` (bare language, e.g. `en`, or the pair is rejected; see *Language codes*), optional `politeness` (`more`/`less`). Returns `{file_id}`.
 2. `GET …/{file_id}/status` until `done` (`error`, `limit_exceeded`, `deleted` are terminal).
@@ -69,7 +70,16 @@ Auth header: `Authorization: Supertext-Auth-Key <key>`. The header name must be 
 
 **`translate="no"`** is respected by the API; the plugin uses it for Joomla plugin tags.
 
-The multipart body is built by hand (`SupertextClient::submit()`): `Joomla\Http`'s curl transport only sends arrays as multipart when you set the `Content-Type` yourself, and then curl adds no boundary.
+The SDK builds the multipart body itself and passes it as a string with its boundary in `Content-Type`: `Joomla\Http`'s curl transport only sends arrays as multipart when you set the `Content-Type` yourself, and then curl adds no boundary.
+
+### Supertext SDK
+
+The protocol, the retries, the language codes and the `data-st-id` document come from the official Supertext PHP SDK ([Supertext/Supertext-API-SDK-and-Guide](https://github.com/Supertext/Supertext-API-SDK-and-Guide), MIT). The plugin ships a copy in `plugin/src/Sdk/` with its namespace changed from `Supertext\Sdk` to `Supertext\Plugin\System\Supertext\Sdk`, so Joomla's autoloader for the plugin (`<namespace path="src">`) loads it, sites install nothing extra and another extension that ships the SDK itself can't clash with it. `plugin/src/Sdk/COMMIT` names the SDK revision.
+
+- Never edit `plugin/src/Sdk/`. Fix the SDK in its repository, then run `scripts/vendor-sdk.sh [ref]` (default `main`; `SDK_DIR=/path/to/clone` uses a local clone) and the tests.
+- `Api\SupertextClient` keeps the plugin's interface (`translateDocument`, `translateSegments`, `validateApiKey`, transport callable) and turns every SDK error code into a `SupertextException` reason (`REASONS`). A new SDK error code needs a reason there and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
+- PHPStan analyses `plugin/src/`, the SDK copy included (it passes level 8 in its own repository).
+- The live API answers an unknown language (`xx-YY`) with HTTP 404 `INVALID_LANGUAGE_PAIR`; the SDK reports it as `invalid_language_pair` with both codes, shown as "Supertext does not support this language pair (en → xx-YY)".
 
 ### Language codes
 
@@ -114,7 +124,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: API client (protocol, auth header, 429 retries, errors), language codes, HtmlDocument and the language files
+composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, segments, splitting), language codes, plugin-tag protection and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 
@@ -211,7 +221,7 @@ The release attaches `plg_system_supertext-X.Y.Z.zip`, built by `./build.sh`.
 - Joomla coding standard (PSR-12 based), namespaced plugin structure (`services/provider.php`, `src/`), `\defined('_JEXEC') or die;` in files that use Joomla.
 - Keep `src/Api` free of Joomla classes so it stays unit-testable.
 - User-visible strings in the language files: `plugin/language/{en-GB,de-DE,de-CH,fr-FR,it-IT}/plg_system_supertext.ini` (and `.sys.ini` for the extension manager). New or changed strings need English, German (both `de-DE` and `de-CH`: `ss` instead of `ß`, `«»` quotes), French and Italian in the same commit; `tests/LanguageFilesTest.php` checks that every file has the same keys, placeholders and URLs as `en-GB`. Formal address (Sie, vous, Lei) and Joomla's own terms in each language (*Beitrag*, *article*, *articolo*; *Versteckt*, *Dépublié*, *Non pubblicato*).
-- The API client (`src/Api`, no Joomla classes) throws `SupertextException` with an English message and a `reason` (e.g. `limit_exceeded`); `Service\Messages` shows the `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string instead. A new reason needs that string in all five files.
+- The API client (`src/Api`, no Joomla classes, built on the bundled SDK in `src/Sdk`) throws `SupertextException` with an English message and a `reason` (e.g. `limit_exceeded`); `Service\Messages` shows the `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string instead. A new reason needs that string in all five files.
 - Keep the three docs in `docs/` current with every change (see `CLAUDE.md`).
 
 ## Known limitations / roadmap
