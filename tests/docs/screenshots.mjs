@@ -6,10 +6,15 @@
  *   BASE_URL (default http://127.0.0.1:8092)
  *   DEMO_ADMIN_EMAIL / DEMO_ADMIN_PASSWORD     settings screens (Super User)
  *   DEMO_EDITOR_EMAIL / DEMO_EDITOR_PASSWORD   translating (Manager)
+ *   PUBLIC_URL (default the Railway demo)      shown instead of BASE_URL in addresses on screen (the ping URL)
+ *
+ * Start the site with SUPERTEXT_REPORT_URL pointing at the stand-in (http://127.0.0.1:8765/report),
+ * so saving the settings reports to the stand-in, not to Supertext's Commando Center.
  */
 import { chromium } from 'playwright'
 
 const B = process.env.BASE_URL || 'http://127.0.0.1:8092'
+const PUBLIC = process.env.PUBLIC_URL || 'https://joomla-production-096c.up.railway.app'
 const OUT = new URL('../../docs/images', import.meta.url).pathname
 const pad = (r, p = 8) => ({ x: Math.max(0, r.x - p), y: Math.max(0, r.y - p), width: r.width + 2 * p, height: r.height + 2 * p })
 const union = (...rs) => {
@@ -51,15 +56,27 @@ async function session(email, password) {
   await page.locator('#jform_params_api_key').fill('Supertext-Auth-Key docs-demo-key')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page.waitForLoadState('networkidle')
+  // Saving runs the automatic key check and shows its result.
+  await page.locator('joomla-alert, .alert', { hasText: 'API key checked' }).first().waitFor()
+  const tested = page.waitForResponse((r) => r.url().includes('option=com_ajax'))
   await page.locator('button:has-text("Test connection")').click()
-  await page.locator('text=Connected. The API key works.').waitFor()
-  await shot('plugin-settings', union(await box('joomla-tab[view="tabs"] [role="tablist"], #myTab [role="tablist"], [role="tablist"]'), await box('#jform_params_custom_fields1, #jform_params_custom_fields')))
+  await tested
+  await page.locator('[id$="-result"]', { hasText: 'API key checked: the connection to Supertext works.' }).waitFor()
+  // No local addresses on screen: show the ping URL with the public demo's address.
+  await page.evaluate(([local, pub]) => document.querySelectorAll('.supertext-reporting code').forEach((c) => { c.textContent = c.textContent.replace(local, pub) }), [B, PUBLIC])
+  await page.setViewportSize({ width: 1280, height: 1400 }) // the settings run below the default viewport
+  await shot('plugin-settings', union(await box('joomla-tab[view="tabs"] [role="tablist"], #myTab [role="tablist"], [role="tablist"]'), await box('.supertext-reporting')))
+  await page.setViewportSize({ width: 1280, height: 860 })
   await page.getByRole('tab', { name: 'Languages' }).click()
   await page.locator('joomla-field-subform .group-add').first().click()
   await page.waitForTimeout(500)
-  await page.locator('joomla-field-subform tbody select').first().selectOption('fr-FR')
-  await page.locator('joomla-field-subform tbody input[type=text]').first().fill('fr-CH')
-  await page.locator('joomla-field-subform tbody select').nth(1).selectOption('more')
+  await page.locator('joomla-field-subform tbody select[name$="[language]"]').first().selectOption('fr-FR')
+  await page.locator('joomla-field-subform tbody select[name$="[code]"]').first().selectOption('fr-CH')
+  await page.locator('joomla-field-subform tbody select[name$="[politeness]"]').first().selectOption('more')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('tab', { name: 'Languages' }).click()
+  await page.waitForTimeout(300)
   await shot('plugin-languages', union(await box('[role="tablist"]'), await box('joomla-field-subform')))
   await page.locator('joomla-toolbar-button button', { hasText: /^\s*Close\s*$/ }).click()
   await page.waitForLoadState('networkidle')

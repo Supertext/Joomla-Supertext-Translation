@@ -65,6 +65,8 @@ jobs:
       DEMO_EDITOR_PASSWORD: ci-editor-password-1
       SUPERTEXT_API_KEY: Supertext-Auth-Key ci-key
       SUPERTEXT_API_ENDPOINT: http://127.0.0.1:8765/v1/
+      # The stand-in also plays the Commando Center: version reports never reach the real one.
+      SUPERTEXT_REPORT_URL: http://127.0.0.1:8765/report
       PGPASSWORD: postgres
     services:
       postgres:
@@ -111,6 +113,8 @@ jobs:
           php site/cli/joomla.php extension:enable "$id" -n
           php site/cli/joomla.php supertext:demo-setup -n --remove-user=ci
           php site/cli/joomla.php supertext:demo-setup -n   # second start: nothing changes
+          # The site URL Joomla reports on the command line (and the ping address).
+          php site/cli/joomla.php config:set live_site=http://127.0.0.1:8091 -n
       - name: Translate the sample articles
         run: php site/cli/joomla.php supertext:translate 1 2 -n
       - name: Check the German translation and its association
@@ -123,5 +127,20 @@ jobs:
           test "$(q "SELECT COUNT(*) FROM jos_users")" = "2"
       - name: Second run skips existing translations
         run: php site/cli/joomla.php supertext:translate 1 -n | grep -c skipped | grep -q 3
+      - name: Commando Center report and ping
+        run: |
+          reports=$(grep '^report ' standin.log)
+          echo "$reports"
+          test "$(grep -c '"event":"installed"' <<< "$reports")" = "1"
+          grep -qF '"plugin":{"name":"Joomla-Supertext-Translation"' <<< "$reports"
+          grep -qF '"system":{"name":"Joomla","version":"'"$JOOMLA_VERSION"'"}' <<< "$reports"
+          grep -qF '"callback":{"url":"http://127.0.0.1:8091/index.php?option=com_ajax&plugin=supertext&group=system&format=json"}' <<< "$reports"
+          if grep -qF 'ci-key' standin.log; then echo "API key in a report"; exit 1; fi
+          (cd site && nohup php -S 127.0.0.1:8091 > ../php-server.log 2>&1 &)
+          sleep 2
+          ping='http://127.0.0.1:8091/index.php?option=com_ajax&plugin=supertext&group=system&format=json'
+          # Answered before the Language Filter could redirect to /en/.
+          test "$(curl -s "$ping&challenge=ci-challenge-0123456789")" = '{"ok":true,"plugin":"Joomla-Supertext-Translation","challenge":"ci-challenge-0123456789"}'
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$ping&challenge=bad")" = "400"
       - if: failure()
         run: cat standin.log; tail -50 site/administrator/logs/*.php || true

@@ -20,7 +20,7 @@ use Joomla\Database\DatabaseInterface;
 use Joomla\Database\ParameterType;
 use Joomla\Registry\Registry;
 use Supertext\Plugin\System\Supertext\Api\HtmlDocument;
-use Supertext\Plugin\System\Supertext\Api\LanguageCodes;
+use Supertext\Plugin\System\Supertext\Api\Languages;
 use Supertext\Plugin\System\Supertext\Api\SupertextClient;
 use Supertext\Plugin\System\Supertext\Api\SupertextException;
 
@@ -54,7 +54,8 @@ final class ArticleTranslator
     private const HTML_FIELD_TYPES  = ['editor'];
 
     /**
-     * @param array<string, array{code?: string, politeness?: string}> $languageSettings  keyed by Joomla language tag
+     * @param array<string, array{code?: string, politeness?: string}> $languageSettings  keyed by Joomla language tag: the
+     *        Supertext code (the mapping, see Api\Languages) and tone from the plugin's Languages tab
      */
     public function __construct(
         private readonly CMSApplicationInterface $app,
@@ -104,7 +105,8 @@ final class ArticleTranslator
      * @param list<string> $targets   language tags
      * @param bool         $overwrite update translations that already exist (otherwise they are skipped)
      *
-     * @return list<array{article: int, language: string, status: string, id?: int, title?: string, message?: string}>
+     * @return list<array{article: int, language: string, status: string, id?: int, title?: string, message?: string, reason?: string, httpStatus?: int}>
+     *         reason/httpStatus: for Supertext errors (e.g. "auth_failed", 401), so the plugin can tell the key check
      */
     public function translate(int $articleId, array $targets, bool $overwrite, User $user): array
     {
@@ -145,7 +147,8 @@ final class ArticleTranslator
                 $saved     = $this->translateInto($article, $tag, $existing ? (int) $existing->id : 0, $user);
                 $results[] = $result + ['status' => $existing ? 'updated' : 'created'] + $saved;
             } catch (\Throwable $e) {
-                $results[] = $result + ['status' => 'error', 'message' => Messages::of($e, $this->app->getLanguage())];
+                $results[] = $result + ['status' => 'error', 'message' => Messages::of($e, $this->app->getLanguage())]
+                    + ($e instanceof SupertextException && $e->reason !== '' ? ['reason' => $e->reason, 'httpStatus' => (int) $e->getCode()] : []);
             }
         }
 
@@ -155,6 +158,12 @@ final class ArticleTranslator
     /** @return array{id: int, title: string} */
     private function translateInto(object $article, string $tag, int $existingId, User $user): array
     {
+        // Supertext codes first: an unmapped language or a tone Supertext lacks fails before anything else.
+        $mapping    = Languages::mapping($this->languageSettings);
+        $code       = Languages::target($tag, $mapping);
+        $source     = Languages::source((string) $article->language, $mapping);
+        $politeness = Languages::politeness($code, (string) ($this->languageSettings[$tag]['politeness'] ?? 'default'));
+
         $target = $existingId ? $this->loadArticle($existingId) : null;
         $catid  = $target ? (int) $target->catid : $this->targetCategory((int) $article->catid, $tag);
 
@@ -198,7 +207,7 @@ final class ArticleTranslator
             }
         }
 
-        $translated = $this->translateFields($fields, $tag, (string) $article->language);
+        $translated = $this->translateFields($fields, $code, $source, $politeness);
 
         foreach (self::IMAGE_TEXTS as $name) {
             if (isset($translated['images.' . $name])) {
@@ -289,7 +298,7 @@ final class ArticleTranslator
      *
      * @return array<string, string> key => translation (only for non-empty fields that came back)
      */
-    private function translateFields(array $fields, string $tag, string $sourceTag): array
+    private function translateFields(array $fields, string $code, string $source, string $politeness): array
     {
         $keys     = [];
         $segments = [];
@@ -307,11 +316,7 @@ final class ArticleTranslator
             return [];
         }
 
-        $settings   = $this->languageSettings[$tag] ?? [];
-        $code       = LanguageCodes::target($tag, (string) ($settings['code'] ?? ''));
-        $source     = LanguageCodes::source($sourceTag, (string) ($this->languageSettings[$sourceTag]['code'] ?? ''));
-        $politeness = (string) ($settings['politeness'] ?? 'default');
-        $out        = [];
+        $out = [];
 
         // The Supertext SDK packs the segments into documents below the size limit.
         foreach ($this->client->translateSegments($segments, $code, $source, $politeness) as $i => $translation) {

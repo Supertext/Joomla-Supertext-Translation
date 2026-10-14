@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Plugin\System\Supertext\Sdk;
+namespace Supertext\Plugin\System\Supertext\Sdk\V1;
 
 /**
  * Form of address in the translation, for languages that have one.

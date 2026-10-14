@@ -24,13 +24,17 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 
 | Class / file | Responsibility |
 | --- | --- |
-| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables. |
+| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`; on the site: the ping), `onAfterInitialise` (answers the ping before routing), `onExtensionBeforeSave` (keeps the locked API key), `onExtensionAfterSave` (key check and report after saving the settings), `onPageCacheIsExcluded` (no page cache for the ping) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables, and the Commando Center glue (`reporting()`). |
 | `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
 | `Api\SupertextClient` | Wrapper around the bundled Supertext SDK (`src/Sdk`): documents below 900k characters, protocol, retries; maps SDK error codes to reasons. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests; `Api\CallableTransport`). |
 | `Sdk\…` | Bundled copy of the Supertext PHP SDK, namespace `Supertext\Plugin\System\Supertext\Sdk` (see *Supertext SDK*). Never edit. |
-| `Api\LanguageCodes` | Language code rules from the SDK (bare source, regional target with defaults) plus the override; no Joomla dependency. |
+| `Api\Languages` | Content language → Supertext code with the SDK's `V1\Languages` (mapping from the Languages tab, else an exact Supertext code, else `unsupported_language`), the source, and the tone check (`unsupported_feature`); no Joomla dependency. |
+| `Api\Reporting`, `Api\StateStorage` | Commando Center: version reports, the API key check and the ping answer, on the SDK's `InstallationReporter`; never throws. No Joomla dependency. |
+| `Service\ExtensionStateStorage` | Keeps the reporter's state (JSON) and the last site URL in the plugin's `#__extensions.custom_data`. |
 | `Api\HtmlDocument` | Wraps Joomla plugin tags (`{loadmodule …}`) in `<span translate="no">` and unwraps them afterwards. |
-| `Field\ConnectionField` | The *Test connection* button in the plugin settings. |
+| `Field\ConnectionField` | *API key check* in the plugin settings: the latest check with its time and the *Test connection* button; schedules the back-end report check. |
+| `Field\ReportingField` | Under *Send version information to Supertext*: what is sent, a `SUPERTEXT_VERSION_REPORTS` override, the ping address. |
+| `Field\SupertextlanguageField`, `Field\LanguagestatusField` | The *Supertext language* list of a Languages row (Supertext's codes, named with PHP intl in the user's language) and the *Your content languages* overview (code per content language, *Not mapped*, tone warnings). |
 | `Console\TranslateCommand` | `supertext:translate <ids>… [--to=tag]… [--overwrite] [--user=name]` |
 | `media/js/supertext.js`, `media/css/supertext.css`, `media/joomla.asset.json` | The dialog (native `<dialog>`, Joomla's Bootstrap classes); registered as web assets `plg_system_supertext.dialog`. |
 | `language/{en-GB,de-DE,de-CH,fr-FR,it-IT}` | UI strings (plugin-local language files, loaded with `autoloadLanguage`). |
@@ -59,7 +63,7 @@ Each field is one `<div data-st-id>`. The live API translates every such element
 
 Shared with every Supertext plugin. Every call goes through the Supertext SDK (see *Supertext SDK*); this is what it does:
 
-1. `POST {base}translate/ai/file`: multipart with `file` (part `Content-Type` exactly `text/html`, no charset, or the API answers 415), `target_lang` (regional code, e.g. `de-CH`), optional `source_lang` (bare language, e.g. `en`, or the pair is rejected; see *Language codes*), optional `politeness` (`more`/`less`). Returns `{file_id}`.
+1. `POST {base}translate/ai/file`: multipart with `file` (part `Content-Type` exactly `text/html`, no charset, or the API answers 415), `target_lang` (a Supertext target code, e.g. `de-CH`, `es`; see *Language codes*), optional `source_lang` (bare language, e.g. `en`), optional `politeness` (`more`/`less`). Returns `{file_id}`.
 2. `GET …/{file_id}/status` until `done` (`error`, `limit_exceeded`, `deleted` are terminal).
 3. `GET …/{file_id}/translation` returns the translated HTML.
 4. `DELETE …/{file_id}` (files also expire after 24 h).
@@ -74,22 +78,42 @@ The SDK builds the multipart body itself and passes it as a string with its boun
 
 ### Supertext SDK
 
-The protocol, the retries, the language codes and the `data-st-id` document come from the official Supertext PHP SDK ([Supertext/Supertext-API-SDK-and-Guide](https://github.com/Supertext/Supertext-API-SDK-and-Guide), MIT). The plugin ships a copy in `plugin/src/Sdk/` with its namespace changed from `Supertext\Sdk` to `Supertext\Plugin\System\Supertext\Sdk`, so Joomla's autoloader for the plugin (`<namespace path="src">`) loads it, sites install nothing extra and another extension that ships the SDK itself can't clash with it. `plugin/src/Sdk/COMMIT` names the SDK revision.
+The protocol, the retries, the language list, the key check, the version reports and the `data-st-id` document come from the official Supertext PHP SDK ([Supertext/Supertext-API-SDK-and-Guide](https://github.com/Supertext/Supertext-API-SDK-and-Guide), MIT; 0.2.0). The plugin ships a copy in `plugin/src/Sdk/` with its namespace changed from `Supertext\Sdk` to `Supertext\Plugin\System\Supertext\Sdk`, so Joomla's autoloader for the plugin (`<namespace path="src">`) loads it, sites install nothing extra and another extension that ships the SDK itself can't clash with it. Everything that talks to the API is in its `V1` namespace (`Sdk\V1\Client`, `Languages`, `InstallationReporter`, …); only the HTTP transport (`Sdk\Http`) and `Sdk\Supertext::SDK_VERSION` are outside. `plugin/src/Sdk/COMMIT` names the SDK revision.
 
 - Never edit `plugin/src/Sdk/`. Fix the SDK in its repository, then run `scripts/vendor-sdk.sh [ref]` (default `main`; `SDK_DIR=/path/to/clone` uses a local clone) and the tests.
-- `Api\SupertextClient` keeps the plugin's interface (`translateDocument`, `translateSegments`, `validateApiKey`, transport callable) and turns every SDK error code into a `SupertextException` reason (`REASONS`). A new SDK error code needs a reason there and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
+- `Api\SupertextClient` keeps the plugin's interface (`translateDocument`, `translateSegments`, `validateApiKey`, `checkApiKey`, transport callable) and turns every SDK error code into a `SupertextException` reason (`REASONS`, `fromSdk()`). A new SDK error code needs a reason there and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
 - PHPStan analyses `plugin/src/`, the SDK copy included (it passes level 8 in its own repository).
 - The live API answers an unknown language (`xx-YY`) with HTTP 404 `INVALID_LANGUAGE_PAIR`; the SDK reports it as `invalid_language_pair` with both codes, shown as "Supertext does not support this language pair (en → xx-YY)".
 
 ### Language codes
 
-Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Api\LanguageCodes` applies the rule; `ArticleTranslator::translateFields()` feeds it the article's and the target's content language tags and the *Supertext language code* from the plugin's Languages tab:
+Supertext accepts exactly the codes its `GET features` lists (the SDK's `V1\Languages::SOURCES` and `TARGETS`, from the live API in October 2026): bare sources (`en`, `de`); targets in one exact form each, regional for German, English, French, Italian and Portuguese (`de-CH`, `en-US`, `pt-BR`), with a script for Chinese and Serbian (`zh-Hans`, `sr-Latn`), a dialect for Swiss German (`gsw-u-sd-chzh`), bare for the others (`es`, `nl`, `sl`). Anything else is HTTP 404 `INVALID_LANGUAGE_PAIR`; formal/informal for a target without it (`en-US`, `en-GB`, `rm`, `sq`, `sr-*`, `gsw-*`) is HTTP 400 `FEATURE_ERROR` (`unsupported_feature`). The old default regions (`es-ES`, `sl-SI`, `zh-CN`) are rejected by the live API, so they're gone.
 
-- Source: the article's language tag (or its Supertext code) reduced to the language: `en-GB` → `en`.
-- Target: the Supertext code if set, otherwise the language tag. A code with a region keeps it, normalized (`de_ch` / `de-ch` → `de-CH`; scripts and numeric regions stay: `zh-Hant`, `es-419`). A bare code gets a regional default: ar→ar-SA, bg→bg-BG, cs→cs-CZ, da→da-DK, de→de-DE, el→el-GR, en→en-US, es→es-ES, et→et-EE, fi→fi-FI, fr→fr-FR, hr→hr-HR, hu→hu-HU, it→it-IT, ja→ja-JP, ko→ko-KR, lt→lt-LT, lv→lv-LV, nb→nb-NO, nl→nl-NL, pl→pl-PL, pt→pt-PT, ro→ro-RO, ru→ru-RU, sk→sk-SK, sl→sl-SI, sr→sr-RS, sv→sv-SE, th→th-TH, tr→tr-TR, uk→uk-UA, vi→vi-VN, zh→zh-CN (same table as the other Supertext plugins). Joomla's tags always have a region, so the default only applies to a bare Supertext code. Unknown bare codes are sent unchanged, so Supertext's error names them.
-- Translating within one language (source `en`, target `en-US`) is allowed.
+`Api\Languages` resolves every content language **without guessing**; `ArticleTranslator::translateInto()` calls it first, so an unmapped language fails before anything is checked, read or sent:
 
-The stand-in (`tests/docs/stand-in.mjs`, also used by the CI job **joomla**) rejects bare targets and regional sources like the real API.
+- **Mapping** (`Languages::mapping()`): the rows of the plugin's Languages tab with a *Supertext language* (`params.languages[*].code`, same name and storage as the former *Supertext language code*), content language tag → code.
+- **Target** (`Languages::target()`, the SDK's `Languages::target($tag, $mapping)`): the mapping's value (sent as it is, so a code Supertext adds later works before the SDK knows it); else the tag if it equals a Supertext code apart from case and `_`/`-` (`de-CH`, `fr-FR`, `it-IT`, `en-GB`); else `unsupported_language` with the tag, shown as *The language es-ES has no Supertext language yet…*. Joomla's tags always have a region, so `es-ES`, `nl-NL`, `zh-CN`, `nb-NO` and most others need a row.
+- **Source** (`Languages::source()`): the bare language of the article language's mapped code (`de-CH` → `de`, `zh-Hans` → `zh`), else of its tag (`en-GB` → `en`); else `unsupported_language`. No pair within one language.
+- **Tone** (`Languages::politeness()`): `more`/`less` for a target where the SDK's `supportsPoliteness()` is `false` throws `unsupported_feature` before sending (the setting is never dropped silently); unknown (mapped) codes are sent and Supertext decides.
+- The settings show *Your content languages* (`Extension\Supertext::languageOverview()`): the code per content language, *Not mapped*, and a warning for a tone the target lacks. The *Supertext language* list (`Field\SupertextlanguageField`) offers `Languages::TARGETS`; a saved value that isn't one stays selectable (*(not a Supertext code)*), and choosing a content language in a row pre-selects its exact match (inline script).
+
+The stand-in (`tests/docs/stand-in.mjs`, also used by the CI job **joomla**) accepts exactly the live list, answers other pairs with HTTP 404 `INVALID_LANGUAGE_PAIR` and politeness where it isn't offered with HTTP 400 `FEATURE_ERROR`.
+
+### Commando Center: version reports, key check, ping
+
+Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/Commando-Center-Supertext-Translation) → `docs/DEVELOPER.md` → *Report protocol*. The SDK's `InstallationReporter` implements it; `Api\Reporting` only supplies what the plugin knows and never throws (a broken database, an unreachable center or Supertext never break a save or a translation):
+
+- **Setting:** `version_reports` (*Send version information to Supertext*, radio, default on) on the Plugin tab; `Reporting::enabled()` = the SDK's `reportsEnabled()`, so `SUPERTEXT_VERSION_REPORTS` (`0`/`false`/`off`/`no`, `1`/`true`/`on`/`yes`) wins. Off: nothing is sent, the ping answers 404. `SUPERTEXT_REPORT_URL` sends reports elsewhere (tests, the stand-in).
+- **Report fields:** `site_url` = `Uri::root()` in web requests (`live_site` wins there too); on the CLI `live_site`, else the site URL stored by the last web request (none: the key is checked, nothing reported). Plugin `Joomla-Supertext-Translation` with the version from `plugin/supertext.xml` (`Reporting::pluginVersion()`, the same source as the extension manager); system `Joomla` with `Version::getShortVersion()`; runtime PHP; `callback.url` = `<site>/index.php?option=com_ajax&plugin=supertext&group=system&format=json`. Reports and key checks go through Joomla's HTTP client (`Api\CallableTransport`, which passes the SDK's timeouts: 3 s for a report, 10 s for the check).
+- **When:**
+  - `afterSettingsSaved` in `onExtensionAfterSave` (context `com_plugins.plugin`, this plugin), with the params just saved; the check is shown with `enqueueMessage()` (success or warning).
+  - `testConnection` on *Test connection* (`action=test`; returns `{ok, status, message, checked}`).
+  - `onRequest` on back-end requests that run the plugin: opening its settings (`Field\ConnectionField`), the dialog (`describe`), `translate` and `supertext:translate`.
+  - `authenticationFailed` when a translation got 401/403 (`ArticleTranslator` returns `reason: auth_failed` and `httpStatus`, stripped from the AJAX answer).
+  - `reportLater()` runs these in a shutdown function, after `fastcgi_finish_request()` on PHP-FPM (otherwise at the end of the request); one per request, a rejected key wins.
+- **State:** `Service\ExtensionStateStorage`: JSON `{"reporter": <ReporterState>, "siteUrl": "…"}` in the plugin's `#__extensions.custom_data`. Joomla's plugin form only replaces `params`, and installing an update loads and keeps the row. Never the key: the state has its SHA-256 fingerprint only.
+- **Ping:** `GET index.php?option=com_ajax&plugin=supertext&group=system&format=json&challenge=…` on the site, answered with `Reporting::ping()` (the SDK's `pingResponse()`: 200 `{"ok":true,"plugin","challenge"}`, 400 for another challenge, 404 with reports off; `Content-Type: application/json`, `Cache-Control: no-store`) and `$app->close()`. It is answered in `onAfterInitialise`, before routing, because the Language Filter redirects `index.php?option=…` to `/en/…` on multilingual sites and the center follows no redirects; `onAjaxSupertext` answers it too on sites without the filter. Other methods get 405. `onPageCacheIsExcluded` keeps it out of the System - Page Cache.
+- **API key field:** the field is `lock="true"`, so it's disabled (not submitted) until *Modify*. `onExtensionBeforeSave` keeps the stored key when the form sent none; before this, saving the settings again deleted the key.
 
 ## Local development
 
@@ -124,7 +148,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, segments, splitting), language codes, plugin-tag protection and the language files
+composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, key check, segments, splitting), languages (mapping, no guessing, tone), Commando Center glue (ReportingTest: setting, when it reports, state, ping, broken storage), plugin-tag protection and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 
@@ -132,7 +156,7 @@ CI (`.github/workflows/ci.yml`) on every push and pull request:
 
 - **unit**: PHP lint on 8.2, 8.3 and 8.4, PHPUnit, `sh -n demo/entrypoint.sh`, package build.
 - **PHPStan**: level 5 against a downloaded Joomla (see *Code quality and security checks*).
-- **joomla**: installs Joomla 6.1 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database.
+- **joomla**: installs Joomla 6.1 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database. The stand-in also plays the Commando Center (`SUPERTEXT_REPORT_URL`): the job checks the one `installed` report (plugin, Joomla version, callback URL, no key) and the public ping through `php -S` on a site with the Language Filter on.
 
 ## Demo (Railway)
 
@@ -149,7 +173,7 @@ The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with Eng
 | `state.php` | Saves/restores `configuration.php` in the table `supertext_demo_state` of the Joomla database |
 | `plg_console_supertextdemo/` | Demo-only console plugin: `supertext:demo-setup` (accounts, languages, Language Filter with associations, a home page per language, language switcher, sample articles; switches off the welcome tour and the statistics prompt) |
 | `createdb.php` | Creates the Joomla database on the server from `DATABASE_URL` |
-| `apache.conf`, `php.ini` | Web server and PHP settings |
+| `apache.conf`, `php.ini` | Web server and PHP settings (`HTTPS=on` behind Railway's TLS proxy, so Joomla's site URL, and the reported ping address, are `https://`) |
 | `.env.example` | The variables below |
 
 **No volume:** Railway allows only three volumes per project and they are taken, so the container keeps no files. Everything that must survive a deploy is in PostgreSQL: the content, the plugin settings and `configuration.php` (in `supertext_demo_state`). Language packs and the plugins are reinstalled from the image on every start, which also updates the plugin. Consequences: media uploaded in the demo's backend disappear with the next deploy (the sample articles use Joomla's bundled images), and Joomla itself is updated by changing `JOOMLA_VERSION` in the `Dockerfile`, not from the backend (after a version change, run `php cli/joomla.php maintenance:database` once if Joomla reports database problems). To reset the demo, drop the `joomla` database and redeploy.
@@ -163,6 +187,7 @@ The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with Eng
 | `DEMO_EDITOR_EMAIL`, `DEMO_EDITOR_PASSWORD` | Optional second account for automated tests and screenshots. Joomla's *Editor* group has no backend access, so this account is a **Manager** (backend, articles, no system settings). |
 | `SUPERTEXT_API_KEY` | Supertext key used by the plugin (wins over the plugin setting) |
 | `SUPERTEXT_API_ENDPOINT` | Optional, e.g. the staging API |
+| `SUPERTEXT_VERSION_REPORTS` | Optional: `0` sends no version information to Supertext (wins over the plugin setting) |
 | `JOOMLA_SITE_NAME`, `JOOMLA_DB_NAME`, `JOOMLA_DB_PREFIX` | Optional, first boot only |
 | `PORT` | Port Apache listens on (Railway sets it; the domain's target port must match) |
 
@@ -187,13 +212,14 @@ The images in `docs/images/` are generated by `tests/docs/screenshots.mjs` (Play
 cd tests/docs && npm install && npx playwright install chromium
 npm run stand-in &
 # a fresh demo (entrypoint or the local setup above, with supertext:demo-setup and DEMO_* set),
-# served with SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/ and *no* SUPERTEXT_API_KEY:
+# served with SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/, SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report
+# (reports go to the stand-in, never to Supertext) and *no* SUPERTEXT_API_KEY:
 # the script enters a key in the plugin settings itself
 BASE_URL=http://127.0.0.1:8092 DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… \
   DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… npm run screenshots
 ```
 
-Start from a database without translations of the sample articles.
+Start from a database without translations of the sample articles. The script saves the settings twice (the key, then a Languages row `fr-FR` → `fr-CH`, formal) and shows the ping address with the public demo's URL (`PUBLIC_URL`) instead of the local one.
 
 ## Code quality and security checks
 
@@ -227,6 +253,8 @@ The release attaches `plg_system_supertext-X.Y.Z.zip`, built by `./build.sh`.
 ## Known limitations / roadmap
 
 - Articles only. Categories, menu items, modules and custom field labels are not translated yet.
+- Without PHP-FPM (e.g. mod_php), a due version report or key check runs at the end of the request, so that one response waits for it (at most 3 s for the report, 10 s for the check); it happens only after updates or a changed key.
+- The *Supertext language* list is the SDK's (October 2026): a language Supertext adds later can be chosen once the bundled SDK is updated.
 - Translation runs inside the request (up to the timeout per language). Planned: a queue via Joomla's Task Scheduler for many articles.
 - Not yet tested on Joomla 5.4, or on MySQL/MariaDB (developed and tested on PostgreSQL).
 - Subform and repeatable custom fields are copied, not translated.

@@ -30,8 +30,11 @@ final class TranslateCommand extends AbstractCommand
 {
     protected static $defaultName = 'supertext:translate';
 
-    /** @param \Closure(): ArticleTranslator $translator */
-    public function __construct(private readonly \Closure $translator, private readonly DatabaseInterface $db)
+    /**
+     * @param \Closure(): ArticleTranslator              $translator
+     * @param \Closure(list<array<string, mixed>>): void $report     the Commando Center's back-end check after translating (runs at the end of the command)
+     */
+    public function __construct(private readonly \Closure $translator, private readonly DatabaseInterface $db, private readonly ?\Closure $report = null)
     {
         parent::__construct();
     }
@@ -65,6 +68,7 @@ final class TranslateCommand extends AbstractCommand
 
         $translator = ($this->translator)();
         $failed     = false;
+        $all        = [];
 
         foreach ((array) $input->getArgument('ids') as $id) {
             $id      = (int) $id;
@@ -76,6 +80,7 @@ final class TranslateCommand extends AbstractCommand
                 }
 
                 foreach ($translator->translate($id, $targets, (bool) $input->getOption('overwrite'), $user) as $result) {
+                    $all[] = $result;
                     $line = sprintf('Article %d → %s: %s', $id, $result['language'], $result['status']);
 
                     if (isset($result['id'])) {
@@ -93,6 +98,10 @@ final class TranslateCommand extends AbstractCommand
                 $failed = true;
                 $io->error(sprintf('Article %d: %s', $id, $e->getMessage()));
             }
+        }
+
+        if ($this->report) {
+            ($this->report)($all);
         }
 
         return $failed ? 1 : 0;

@@ -39,14 +39,20 @@
 					<option value="0">JNO</option>
 					<option value="1">JYES</option>
 				</field>
+				<field name="version_reports" type="radio" label="PLG_SYSTEM_SUPERTEXT_VERSION_REPORTS" layout="joomla.form.field.radio.switcher" default="1" filter="integer">
+					<option value="0">JNO</option>
+					<option value="1">JYES</option>
+				</field>
+				<field name="version_reports_status" type="reporting" hiddenLabel="true" />
 			</fieldset>
 			<fieldset name="languages" label="PLG_SYSTEM_SUPERTEXT_FIELDSET_LANGUAGES" description="PLG_SYSTEM_SUPERTEXT_FIELDSET_LANGUAGES_DESC">
+				<field name="language_status" type="languagestatus" label="PLG_SYSTEM_SUPERTEXT_LANGUAGE_STATUS" description="PLG_SYSTEM_SUPERTEXT_LANGUAGE_STATUS_DESC" />
 				<field name="languages" type="subform" label="PLG_SYSTEM_SUPERTEXT_LANGUAGES" multiple="true" layout="joomla.form.field.subform.repeatable-table" buttons="add,remove">
 					<form>
 						<field name="language" type="contentlanguage" label="JFIELD_LANGUAGE_LABEL" required="true">
 							<option value="">JSELECT</option>
 						</field>
-						<field name="code" type="text" label="PLG_SYSTEM_SUPERTEXT_LANGUAGE_CODE" hint="fr-CH" filter="string" />
+						<field name="code" type="supertextlanguage" label="PLG_SYSTEM_SUPERTEXT_LANGUAGE_CODE" filter="string" />
 						<field name="politeness" type="list" label="PLG_SYSTEM_SUPERTEXT_POLITENESS" default="default" validate="options">
 							<option value="default">PLG_SYSTEM_SUPERTEXT_POLITENESS_DEFAULT</option>
 							<option value="more">PLG_SYSTEM_SUPERTEXT_POLITENESS_MORE</option>

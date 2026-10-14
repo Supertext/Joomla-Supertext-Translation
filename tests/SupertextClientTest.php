@@ -36,7 +36,7 @@ final class SupertextClientTest extends TestCase
             };
         });
 
-        $html = $client->translateDocument('<div data-st-id="0">Hello</div>', 'de-CH', 'en-GB', 'more');
+        $html = $client->translateDocument('<div data-st-id="0">Hello</div>', 'de-CH', 'en', 'more');
 
         self::assertStringContainsString('Hallo', $html);
         self::assertSame(
@@ -194,6 +194,43 @@ final class SupertextClientTest extends TestCase
         } catch (SupertextException $e) {
             self::assertSame('invalid_language_pair', $e->reason);
             self::assertSame(['en', 'xx-YY'], $e->args);
+        }
+    }
+
+    public function testSendsTheCodesAsGiven(): void
+    {
+        $client = $this->client(fn (string $method, string $url) => match (true) {
+            $method === 'POST'                  => ['status' => 200, 'body' => '{"file_id":"f1"}'],
+            str_ends_with($url, '/status')      => ['status' => 200, 'body' => '{"status":"done"}'],
+            str_ends_with($url, '/translation') => ['status' => 200, 'body' => '<div data-st-id="0">Hola</div>'],
+            default                             => ['status' => 200, 'body' => '{}'],
+        });
+
+        $client->translateDocument('<div data-st-id="0">Hello</div>', 'es', 'en');
+
+        self::assertStringContainsString("name=\"target_lang\"\r\n\r\nes\r\n", (string) $this->calls[0]['body']);
+    }
+
+    public function testChecksTheApiKeyWithoutThrowing(): void
+    {
+        self::assertSame('ok', $this->client(fn () => ['status' => 200, 'body' => '{}'])->checkApiKey()->status);
+        self::assertSame('invalid', $this->client(fn () => ['status' => 401, 'body' => '{"error_code":"UNAUTHORIZED"}'])->checkApiKey()->status);
+        self::assertSame('error', $this->client(fn () => ['status' => 404, 'body' => '{}'])->checkApiKey()->status);
+        self::assertSame('missing', $this->client(fn () => ['status' => 200, 'body' => '{}'], '')->checkApiKey()->status);
+        self::assertSame('unreachable', $this->client(static function (): array {
+            throw new \RuntimeException('connection refused');
+        })->checkApiKey()->status);
+    }
+
+    public function testReportsAToneSupertextDoesNotOffer(): void
+    {
+        $client = $this->client(fn () => ['status' => 400, 'body' => '{"error_code":"FEATURE_ERROR","feature":"politeness","source_lang":"de","target_lang":"en-US"}']);
+
+        try {
+            $client->translateDocument('<p>x</p>', 'en-US', 'de', 'more');
+            self::fail('Expected an exception');
+        } catch (SupertextException $e) {
+            self::assertSame('unsupported_feature', $e->reason);
         }
     }
 

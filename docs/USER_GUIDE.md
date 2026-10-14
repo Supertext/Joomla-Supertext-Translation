@@ -72,7 +72,7 @@ If an article already has a translation in a language, the dialog marks it **Alr
 
 ## Formal and informal language
 
-Your administrator can set each language to formal (*Sie/vous*) or informal (*du/tu*). Ask them if the tone doesn't fit your site.
+Your administrator can set each language to formal (*Sie/vous*) or informal (*du/tu*). Ask them if the tone doesn't fit your site. Supertext offers this choice for most languages, but not for English, Swiss German, Romansh, Albanian and Serbian.
 
 ## When something goes wrong
 
@@ -83,7 +83,9 @@ Problems are listed in red in the dialog, per article and language; the other la
 | *Supertext is not set up yet* | Ask your administrator to enter the API key. |
 | *This article's language is "All"* | Set the article's language (e.g. English) in the editor, save, and try again. |
 | *You are not allowed to …* | You need permission to create or edit articles in that category; ask your administrator. |
-| *Supertext does not support this language pair (en → …)* | Supertext can't translate into this language, or its Supertext language code in the plugin settings is wrong. Tell your administrator. |
+| *The language … has no Supertext language yet* | Your administrator hasn't told the plugin which Supertext language to use for it yet. Ask them to map it on the plugin's *Languages* tab; the other languages are translated. |
+| *Supertext does not support this language pair (en → …)* | Supertext can't translate into this language, or the Supertext language set for it in the plugin settings is wrong. Tell your administrator. |
+| *Supertext offers no formal or informal tone for this language* | The tone set for that language isn't available at Supertext; ask your administrator to set it to *Default*. |
 | *Too many requests to Supertext* | Wait a moment and try again. |
 | *Your Supertext translation limit is exceeded* | Your organisation's Supertext volume is used up; contact your administrator. |
 | *Timed out waiting …* | Very long article: try again, or ask your administrator to raise the timeout. |

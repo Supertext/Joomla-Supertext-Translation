@@ -15,15 +15,19 @@ use Supertext\Plugin\System\Supertext\Sdk\Http\TransportException;
 
 /**
  * Sends the Supertext SDK's requests through a callable: Joomla's HTTP client in the
- * plugin (so Joomla's proxy settings apply), a fake in tests. Every HTTP answer, 4xx and
+ * plugin (so Joomla's proxy settings apply), a fake in tests. Translations, the API key
+ * check and the version reports all go through it. Every HTTP answer, 4xx and
  * 5xx included, goes back to the SDK; only a missing answer is an exception.
  */
 final class CallableTransport implements HttpTransport
 {
-    /** @var callable(string, string, array<string, string>, ?string): array{status: int, body: string, headers?: array<string, string>} */
+    /** @var callable(string, string, array<string, string>, ?string, float): array{status: int, body: string, headers?: array<string, string>} */
     private $send;
 
-    /** @param callable(string $method, string $url, array<string, string> $headers, ?string $body): array{status: int, body: string, headers?: array<string, string>} $send */
+    /**
+     * @param callable(string $method, string $url, array<string, string> $headers, ?string $body, float $timeout): array{status: int, body: string, headers?: array<string, string>} $send
+     *        $timeout: seconds for the whole request (the SDK's: 3 s for a version report, 10 s for the key check)
+     */
     public function __construct(callable $send)
     {
         $this->send = $send;
@@ -32,7 +36,7 @@ final class CallableTransport implements HttpTransport
     public function send(HttpRequest $request): HttpResponse
     {
         try {
-            $response = ($this->send)($request->method, $request->url, $request->headers, $request->body);
+            $response = ($this->send)($request->method, $request->url, $request->headers, $request->body, $request->timeout);
         } catch (\Throwable $e) {
             throw new TransportException($e->getMessage(), 0, $e);
         }
