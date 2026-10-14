@@ -24,8 +24,8 @@ use Supertext\Plugin\System\Supertext\Sdk\V1\SupertextException as SdkException;
  * 2. its own tag, if that is a Supertext code (de-CH, fr-FR; case and _/- ignored), else
  * 3. nothing: unsupported_language, and the administrator has to map it (es-ES → es).
  *
- * The source is the bare language of the mapped code or the tag (en-GB → en). No Joomla
- * dependency.
+ * The source is the same mapping's code in its source form (de-CH → de), else the tag's
+ * language (en-GB → en). No Joomla dependency.
  */
 final class Languages
 {
@@ -78,8 +78,9 @@ final class Languages
     }
 
     /**
-     * The source code to send for the article's language: the bare language of its mapped
-     * Supertext code (de-CH → de), else of the tag (en-GB → en). "" stays "" (auto-detect).
+     * The source code to send for the article's language: the mapping in its source form (one
+     * mapping for both directions: de-CH → de), else the tag's language (en-GB → en). "" stays ""
+     * (auto-detect).
      *
      * @param array<string, string> $mapping
      *
@@ -87,16 +88,8 @@ final class Languages
      */
     public static function source(string $tag, array $mapping = []): string
     {
-        $mapped = '';
-
-        foreach ($mapping as $from => $to) {
-            if (self::key((string) $from) === self::key($tag)) {
-                $mapped = $to;
-            }
-        }
-
         try {
-            return SdkLanguages::source($mapped !== '' && SdkLanguages::matchSource($mapped) !== null ? $mapped : $tag);
+            return SdkLanguages::source($tag, $mapping);
         } catch (SdkException $e) {
             throw SupertextClient::fromSdk($e);
         }
@@ -137,10 +130,5 @@ final class Languages
     public static function targets(): array
     {
         return SdkLanguages::TARGETS;
-    }
-
-    private static function key(string $code): string
-    {
-        return strtolower(str_replace('_', '-', trim($code)));
     }
 }

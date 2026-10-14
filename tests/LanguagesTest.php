@@ -83,6 +83,16 @@ final class LanguagesTest extends TestCase
         self::assertSame($expected, Languages::source($tag, Languages::mapping(self::SETTINGS)));
     }
 
+    public function testOneMappingServesBothDirections(): void
+    {
+        $mapping = Languages::mapping(['de' => ['code' => 'de-CH'], 'en' => ['code' => 'en-US']]);
+
+        self::assertSame('de-CH', Languages::target('de', $mapping));
+        self::assertSame('de', Languages::source('de', $mapping));
+        self::assertSame('en-US', Languages::target('en', $mapping));
+        self::assertSame('en', Languages::source('en', $mapping));
+    }
+
     public function testASourceSupertextDoesNotKnowIsRefused(): void
     {
         $this->expectException(SupertextException::class);

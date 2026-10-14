@@ -152,7 +152,9 @@ final class Languages
         if (trim($code) === '') {
             return '';
         }
-        $result = self::mapped($code, $mapping) ?? self::matchSource($code);
+        // One mapping serves both directions: a mapped target code is sent in its source form (de-CH → de).
+        $fromMapping = self::mapped($code, $mapping);
+        $result = $fromMapping !== null ? (self::matchSource($fromMapping) ?? $fromMapping) : self::matchSource($code);
         if ($result === null) {
             throw new SupertextException(SupertextException::UNSUPPORTED_LANGUAGE, sourceLang: trim($code));
         }

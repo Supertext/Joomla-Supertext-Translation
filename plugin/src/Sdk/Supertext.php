@@ -11,7 +11,7 @@ namespace Supertext\Plugin\System\Supertext\Sdk;
 final class Supertext
 {
     /** This SDK's version (sent in version reports). The same number in every Supertext SDK. */
-    public const SDK_VERSION = '0.2.0';
+    public const SDK_VERSION = '0.2.1';
 
     private function __construct()
     {
