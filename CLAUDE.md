@@ -80,7 +80,7 @@ AI file translation API v1, same as the WordPress plugin: POST HTML file → pol
 
 Lessons from the live API, apply them here: header `Authorization: Supertext-Auth-Key <key>` (strip a pasted prefix), retry HTTP 429 (per-second rate limit), and keep a whole text in one `data-st-id` element (each one is translated on its own). **Languages:** only the codes Supertext's `GET features` lists (the SDK's `V1\Languages`): bare sources (`en`); targets regional only for de/en/fr/it/pt (`de-CH`, `en-US`), `zh-Hans`/`zh-Hant`, `sr-Latn`/`sr-Cyrl`, `gsw-u-sd-chzh`/`chbe`, bare for the rest (`es`, `nl`, `sl`). **No guessing:** the plugin's mapping (Languages tab), else an exact match, else the error `unsupported_language`. No default regions; see `docs/DEVELOPER.md` → *Language codes*.
 
-**Commando Center:** version reports, the automatic API key check and the public ping go through the SDK's `InstallationReporter` (`Api\Reporting`, state in `#__extensions.custom_data`); see `docs/DEVELOPER.md` → *Commando Center*. Nothing about reporting may ever break a save or a translation.
+**Commando Center:** version reports, the automatic API key check and the public ping go through Supertext Plugin Health's `InstallationReporter` with the SDK's `checkApiKey()` (`Api\Reporting`, state in `#__extensions.custom_data`); see `docs/DEVELOPER.md` → *Commando Center*. Nothing about reporting may ever break a save or a translation.
 
 ## This repo
 
@@ -90,4 +90,5 @@ Lessons from the live API, apply them here: header `Authorization: Supertext-Aut
 - Translated fields live in `plugin/src/Service/ArticleTranslator.php`; keep "What is translated" in `docs/DEVELOPER.md` and the lists in `docs/USER_GUIDE.md` in sync.
 - Keep `plugin/src/Api` free of Joomla classes (unit tests run without Joomla).
 - All Supertext API calls go through the Supertext PHP SDK, shipped in `plugin/src/Sdk` with its namespace changed to `Supertext\Plugin\System\Supertext\Sdk` (API classes in `Sdk\V1`) and wrapped by `plugin/src/Api/SupertextClient.php`. Never edit `plugin/src/Sdk`: fix the SDK in `Supertext/Supertext-API-SDK-and-Guide` and run `scripts/vendor-sdk.sh`. Every SDK error code needs a reason in `SupertextClient::REASONS` and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
+- Version reports, the key check result and the ping answer come from Supertext Plugin Health, shipped in `plugin/src/PluginHealth` with its namespace changed to `Supertext\Plugin\System\Supertext\PluginHealth`. Never edit `plugin/src/PluginHealth`: fix it in `Supertext/Commando-Center-Supertext-Translation` (`plugin-health/`) and run `scripts/vendor-plugin-health.sh <tag>`.
 - `demo/` is the Railway demo (`railway.json` → `demo/Dockerfile`, context = repo root). The demo-only setup lives in `demo/plg_console_supertextdemo`. Demo secrets live only in Railway variables.

@@ -16,7 +16,7 @@ use Joomla\CMS\Session\Session;
 use Joomla\CMS\Uri\Uri;
 use Supertext\Plugin\System\Supertext\Api\Reporting;
 use Supertext\Plugin\System\Supertext\Extension\Supertext;
-use Supertext\Plugin\System\Supertext\Sdk\V1\ApiKeyCheck;
+use Supertext\Plugin\System\Supertext\PluginHealth\KeyCheck;
 use Supertext\Plugin\System\Supertext\Service\Messages;
 
 // phpcs:disable PSR1.Files.SideEffects
@@ -53,7 +53,7 @@ final class ConnectionField extends FormField
         }
 
         $current = $check
-            ? '<span class="' . ($check->status === ApiKeyCheck::OK ? 'text-success' : 'text-danger') . '">' . Messages::keyCheck($check, $app->getLanguage()) . '</span>'
+            ? '<span class="' . ($check->status === KeyCheck::OK ? 'text-success' : 'text-danger') . '">' . Messages::keyCheck($check, $app->getLanguage()) . '</span>'
                 . ' <span class="small text-muted">' . htmlspecialchars($plugin->checkedAt($check), ENT_QUOTES, 'UTF-8') . '</span>'
             : '<span class="text-muted">' . Text::_('PLG_SYSTEM_SUPERTEXT_KEYCHECK_NOT_CHECKED') . '</span>';
 

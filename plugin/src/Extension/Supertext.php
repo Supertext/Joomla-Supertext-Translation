@@ -36,7 +36,7 @@ use Supertext\Plugin\System\Supertext\Api\Languages;
 use Supertext\Plugin\System\Supertext\Api\Reporting;
 use Supertext\Plugin\System\Supertext\Api\SupertextClient;
 use Supertext\Plugin\System\Supertext\Console\TranslateCommand;
-use Supertext\Plugin\System\Supertext\Sdk\V1\ApiKeyCheck;
+use Supertext\Plugin\System\Supertext\PluginHealth\KeyCheck;
 use Supertext\Plugin\System\Supertext\Service\ArticleTranslator;
 use Supertext\Plugin\System\Supertext\Service\ExtensionStateStorage;
 use Supertext\Plugin\System\Supertext\Service\Messages;
@@ -136,7 +136,7 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
             if ($result?->check) {
                 $this->getApplication()->enqueueMessage(
                     Messages::keyCheck($result->check, $this->getApplication()->getLanguage()),
-                    $result->check->status === ApiKeyCheck::OK ? 'message' : 'warning'
+                    $result->check->status === KeyCheck::OK ? 'message' : 'warning'
                 );
             }
         } catch (\Throwable) {
@@ -361,10 +361,10 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
     private function testConnection(): array
     {
         $result = $this->reporting()->run(Reporting::TEST_CONNECTION, $this->apiKey());
-        $check  = $result->check ?? $this->client($this->apiKey())->checkApiKey();
+        $check  = $result->check ?? KeyCheck::from($this->client($this->apiKey())->checkApiKey()) ?? new KeyCheck(KeyCheck::ERROR, KeyCheck::timestamp(microtime(true)));
 
         return [
-            'ok'      => $check->status === ApiKeyCheck::OK,
+            'ok'      => $check->status === KeyCheck::OK,
             'status'  => $check->status,
             'message' => Messages::keyCheck($check, $this->getApplication()->getLanguage()),
             'checked' => $this->checkedAt($check),
@@ -372,7 +372,7 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
     }
 
     /** "checked 13.10.2026 09:15" in the user's language and time zone. */
-    public function checkedAt(ApiKeyCheck $check): string
+    public function checkedAt(KeyCheck $check): string
     {
         try {
             $time = HTMLHelper::_('date', $check->checkedAt, Text::_('DATE_FORMAT_LC5'));
@@ -384,7 +384,7 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
     }
 
     /** The latest stored API key check, for the settings page. */
-    public function lastCheck(): ?ApiKeyCheck
+    public function lastCheck(): ?KeyCheck
     {
         return $this->reporting()->lastCheck();
     }

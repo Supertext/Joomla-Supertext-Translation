@@ -12,7 +12,7 @@ namespace Supertext\Plugin\System\Supertext\Service;
 
 use Joomla\CMS\Language\Language;
 use Supertext\Plugin\System\Supertext\Api\SupertextException;
-use Supertext\Plugin\System\Supertext\Sdk\V1\ApiKeyCheck;
+use Supertext\Plugin\System\Supertext\PluginHealth\KeyCheck;
 
 /** Turns an exception or an API key check into a message in the user's back-end language. */
 final class Messages
@@ -21,7 +21,7 @@ final class Messages
      * The key check result (texts from the Commando Center's guide): PLG_SYSTEM_SUPERTEXT_KEYCHECK_<STATUS>.
      * HTML (links to supertext.com in a new tab), from the plugin's language files.
      */
-    public static function keyCheck(ApiKeyCheck $check, Language $language): string
+    public static function keyCheck(KeyCheck $check, Language $language): string
     {
         $key = 'PLG_SYSTEM_SUPERTEXT_KEYCHECK_' . strtoupper($check->status);
 

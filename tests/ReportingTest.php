@@ -6,8 +6,9 @@ use PHPUnit\Framework\TestCase;
 use Supertext\Plugin\System\Supertext\Api\CallableTransport;
 use Supertext\Plugin\System\Supertext\Api\Reporting;
 use Supertext\Plugin\System\Supertext\Api\StateStorage;
+use Supertext\Plugin\System\Supertext\Sdk\Supertext;
 
-/** The Commando Center glue: when the SDK's reporter runs, what it sends, where its state goes, the ping. */
+/** The Commando Center glue: when Supertext Plugin Health's reporter (with the SDK's key check) runs, what it sends, where its state goes, the ping. */
 final class ReportingTest extends TestCase
 {
     private const KEY    = 'secret-test-key';
@@ -128,6 +129,7 @@ final class ReportingTest extends TestCase
         self::assertSame(['name' => 'Joomla-Supertext-Translation', 'version' => '0.2.0'], $report['plugin']);
         self::assertSame(['name' => 'Joomla', 'version' => '6.1.4'], $report['system']);
         self::assertSame('PHP', $report['runtime']['name']);
+        self::assertSame(Supertext::SDK_VERSION, $report['sdk_version'], 'the bundled SDK');
         self::assertTrue($report['api_key_configured']);
         self::assertSame('ok', $report['api_key_check']['status']);
         self::assertSame(['url' => 'https://www.example.ch/index.php?option=com_ajax&plugin=supertext&group=system&format=json'], $report['callback']);
@@ -257,6 +259,27 @@ final class ReportingTest extends TestCase
         self::assertNotFalse($xml);
         self::assertSame((string) $xml->version, Reporting::pluginVersion(__DIR__ . '/../plugin/supertext.xml'));
         self::assertSame('0.0.0', Reporting::pluginVersion(__DIR__ . '/missing.xml'));
+    }
+
+    public function testAStateStoredByTheSdk02ReporterIsKept(): void
+    {
+        $this->reporting()->run(Reporting::ON_REQUEST, self::KEY);
+        // What the SDK 0.2 reporter stored (same JSON as Plugin Health's ReporterState).
+        $this->storage->data = [
+            'reporter' => [
+                'reportedVersions'  => '0.2.0|6.1.4|' . PHP_VERSION,
+                'reportedKeyStatus' => 'ok',
+                'lastFailureAt'     => null,
+                'keyCheck'          => ['status' => 'ok', 'checkedAt' => '2026-10-01T08:00:00Z', 'httpStatus' => 200, 'errorCode' => null, 'fingerprint' => hash('sha256', self::KEY)],
+            ],
+            'siteUrl' => 'https://www.example.ch',
+        ];
+        $before      = $this->storage->data;
+        $this->calls = [];
+
+        self::assertNull($this->reporting()->run(Reporting::ON_REQUEST, self::KEY)?->event, 'no new installed report after the update');
+        self::assertSame([], $this->calls);
+        self::assertSame($before, $this->storage->data, 'stored in the same format');
     }
 }
 

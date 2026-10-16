@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Plugin\System\Supertext\Sdk\V1;
+namespace Supertext\Plugin\System\Supertext\PluginHealth;
 
 /**
  * The answer of a plugin's public ping endpoint (InstallationReporter::pingResponse()). Send it as it is.
@@ -10,7 +10,7 @@ namespace Supertext\Plugin\System\Supertext\Sdk\V1;
 final class PingResponse
 {
     /**
-     * @param int                   $status 200, 400 or 404
+     * @param int                   $status  200, 400 or 404
      * @param array<string, string> $headers Content-Type and Cache-Control
      * @param string                $body    JSON
      */
