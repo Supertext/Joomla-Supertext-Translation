@@ -8,7 +8,7 @@ Select articles, click **Supertext**, tick the languages and click **Translate**
 - Translates title, article text (formatting, links and lists are kept), meta description and keywords, image alt texts and captions, link labels, and Text/Textarea/Editor custom fields
 - Leaves plugin tags such as `{loadmodule …}` untouched
 - Overwrites existing translations only when you ask for it, with a clear warning first
-- Formal or informal tone and the Supertext language per content language (no guessed codes)
+- The Supertext language per content language from a list, with a suggested code preselected (no guessed regions), and formal or informal tone
 - Also available on the command line: `php cli/joomla.php supertext:translate`
 
 ![The Supertext dialog in the Joomla Articles list](docs/images/translate-dialog.png)

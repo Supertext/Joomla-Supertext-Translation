@@ -20,7 +20,6 @@ use Joomla\CMS\Event\PageCache\IsExcludedEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
 use Joomla\CMS\Http\HttpFactory;
 use Joomla\CMS\HTML\HTMLHelper;
-use Joomla\CMS\Language\LanguageHelper;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Session\Session;
@@ -404,31 +403,6 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
     }
 
     /**
-     * Every content language with the Supertext code it is sent as (null: not mapped yet) and its tone.
-     *
-     * @return list<array{tag: string, title: string, target: ?string, politeness: string, politenessSupported: ?bool}>
-     */
-    public function languageOverview(): array
-    {
-        $settings = $this->languageSettings();
-        $mapping  = Languages::mapping($settings);
-        $rows     = [];
-
-        foreach (LanguageHelper::getContentLanguages([0, 1]) as $tag => $language) {
-            $target = Languages::targetOrNull((string) $tag, $mapping);
-            $rows[] = [
-                'tag'                 => (string) $tag,
-                'title'               => (string) $language->title,
-                'target'              => $target,
-                'politeness'          => (string) ($settings[$tag]['politeness'] ?? 'default'),
-                'politenessSupported' => $target !== null ? Languages::supportsPoliteness($target) : null,
-            ];
-        }
-
-        return $rows;
-    }
-
-    /**
      * Runs a reporter action (version report, key check if the key changed) after the response,
      * so the back end never waits for it: on PHP-FPM the response is finished first; otherwise it
      * runs at the end of the request. Only one action per request (a rejected key wins).
@@ -499,21 +473,14 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
         return Reporting::siteUrl($app->get('live_site'));
     }
 
-    /** @return array<string, array{code: string, politeness: string}> keyed by content language tag */
+    /**
+     * The Languages tab (both the current format and the rows of 0.1.0, see Languages::settings()).
+     *
+     * @return array<string, array{code: string, politeness: string}> keyed by content language tag
+     */
     private function languageSettings(): array
     {
-        $languages = [];
-
-        foreach ((array) $this->params->get('languages', []) as $row) {
-            $row = (array) $row;
-            $tag = (string) ($row['language'] ?? '');
-
-            if ($tag !== '') {
-                $languages[$tag] = ['code' => (string) ($row['code'] ?? ''), 'politeness' => (string) ($row['politeness'] ?? 'default')];
-            }
-        }
-
-        return $languages;
+        return Languages::settings($this->params->get('languages', []));
     }
 
     private function translator(): ArticleTranslator

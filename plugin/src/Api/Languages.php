@@ -12,23 +12,97 @@ use Supertext\Plugin\System\Supertext\Sdk\V1\Languages as SdkLanguages;
 use Supertext\Plugin\System\Supertext\Sdk\V1\SupertextException as SdkException;
 
 /**
- * Joomla content languages → Supertext language codes, without guessing (the SDK's rules,
- * the same in every Supertext plugin).
+ * Joomla content languages → Supertext language codes (the SDK's rules, the same in every
+ * Supertext plugin).
  *
  * Supertext accepts only the codes of its `GET features` list (Sdk\V1\Languages::TARGETS):
  * regional for German, English, French, Italian and Portuguese (de-CH, en-US, pt-BR), with a
  * script for Chinese and Serbian (zh-Hans, sr-Latn), a dialect for Swiss German
  * (gsw-u-sd-chzh), bare for all others (es, nl, sl). A content language is sent as:
  *
- * 1. the Supertext code set for it on the plugin's Languages tab (the mapping), else
+ * 1. the Supertext language chosen for it on the plugin's Languages tab (the mapping), else
  * 2. its own tag, if that is a Supertext code (de-CH, fr-FR; case and _/- ignored), else
- * 3. nothing: unsupported_language, and the administrator has to map it (es-ES → es).
+ * 3. the SDK's default where one is obvious (de → de-DE, es-ES → es, zh-CN → zh-Hans), else
+ * 4. nothing: unsupported_language, and the administrator has to choose one (en-IE, gsw).
  *
  * The source is the same mapping's code in its source form (de-CH → de), else the tag's
  * language (en-GB → en). No Joomla dependency.
  */
 final class Languages
 {
+    private const TONES = ['default', 'more', 'less'];
+
+    /**
+     * The saved Languages tab as tag → {code, politeness}. Reads the current format (keyed by
+     * content language tag) and the repeatable rows of plugin versions up to 0.1.0
+     * ({"languages0": {"language": "es-ES", "code": "es", ...}}), so an upgrade loses nothing:
+     * the next save writes the current format.
+     *
+     * @return array<string, array{code: string, politeness: string}>
+     */
+    public static function settings(mixed $stored): array
+    {
+        if (\is_string($stored)) {
+            $stored = json_decode($stored, true);
+        }
+
+        if (\is_object($stored)) {
+            $stored = json_decode((string) json_encode($stored), true);
+        }
+
+        $settings = [];
+
+        foreach (\is_array($stored) ? $stored : [] as $key => $row) {
+            if (!\is_array($row)) {
+                continue;
+            }
+
+            $tag = trim((string) (isset($row['language']) ? $row['language'] : $key));
+
+            if ($tag === '') {
+                continue;
+            }
+
+            $settings[$tag] = [
+                'code'       => trim((string) ($row['code'] ?? '')),
+                'politeness' => \in_array($row['politeness'] ?? null, self::TONES, true) ? (string) $row['politeness'] : 'default',
+            ];
+        }
+
+        return $settings;
+    }
+
+    /**
+     * The Languages tab as posted, validated for saving: tags that look like language tags,
+     * codes only from Supertext's list (written as the list writes them, else ""), a formal or
+     * informal tone only where the chosen code offers it.
+     *
+     * @return array<string, array{code: string, politeness: string}>
+     */
+    public static function clean(mixed $posted): array
+    {
+        $clean = [];
+
+        foreach (self::settings($posted) as $tag => $row) {
+            if (preg_match('/^[A-Za-z0-9_-]{1,32}$/', $tag) !== 1) {
+                continue;
+            }
+
+            $code       = $row['code'] !== '' ? (SdkLanguages::matchTarget($row['code']) ?? '') : '';
+            $politeness = $code !== '' && SdkLanguages::supportsPoliteness($code) === true ? $row['politeness'] : 'default';
+
+            $clean[$tag] = ['code' => $code, 'politeness' => $politeness];
+        }
+
+        return $clean;
+    }
+
+    /** What the Languages tab preselects for a content language without a saved choice: the exact Supertext code, else the default, else null. */
+    public static function suggest(string $tag): ?string
+    {
+        return SdkLanguages::suggestTarget($tag);
+    }
+
     /**
      * The mapping from the plugin's Languages tab: content language tag → Supertext code (rows without a code are left out).
      *
@@ -56,7 +130,7 @@ final class Languages
      *
      * @param array<string, string> $mapping
      *
-     * @throws SupertextException unsupported_language when it is neither mapped nor a Supertext code
+     * @throws SupertextException unsupported_language when it is not mapped, not a Supertext code and has no default
      */
     public static function target(string $tag, array $mapping = []): string
     {
@@ -67,7 +141,7 @@ final class Languages
         }
     }
 
-    /** The target code, or null when the language still needs a mapping (for the settings page). */
+    /** The target code, or null when the language has neither a mapping, an exact code nor a default. */
     public static function targetOrNull(string $tag, array $mapping = []): ?string
     {
         try {
@@ -126,9 +200,9 @@ final class Languages
         return SdkLanguages::matchTarget($tag);
     }
 
-    /** @return list<array{code: string, name: string, politeness: bool}> Supertext's target languages, e.g. for the settings' list */
+    /** @return list<array{code: string, name: string, politeness: bool}> Supertext's target languages sorted by English name, for the Languages tab's lists */
     public static function targets(): array
     {
-        return SdkLanguages::TARGETS;
+        return SdkLanguages::targetOptions();
     }
 }

@@ -83,8 +83,8 @@ Problems are listed in red in the dialog, per article and language; the other la
 | *Supertext is not set up yet* | Ask your administrator to enter the API key. |
 | *This article's language is "All"* | Set the article's language (e.g. English) in the editor, save, and try again. |
 | *You are not allowed to …* | You need permission to create or edit articles in that category; ask your administrator. |
-| *The language … has no Supertext language yet* | Your administrator hasn't told the plugin which Supertext language to use for it yet. Ask them to map it on the plugin's *Languages* tab; the other languages are translated. |
-| *Supertext does not support this language pair (en → …)* | Supertext can't translate into this language, or the Supertext language set for it in the plugin settings is wrong. Tell your administrator. |
+| *The language … has no Supertext language yet* | Your administrator hasn't told the plugin which Supertext language to use for it yet. Ask them to choose one for it on the plugin's *Languages* tab (*System → Plugins → System - Supertext Translation → Languages*); the other languages are translated. |
+| *Supertext does not support this language pair (en → …)* | Supertext can't translate into this language, or the Supertext language chosen for it on the plugin's *Languages* tab is wrong. Tell your administrator. |
 | *Supertext offers no formal or informal tone for this language* | The tone set for that language isn't available at Supertext; ask your administrator to set it to *Default*. |
 | *Too many requests to Supertext* | Wait a moment and try again. |
 | *Your Supertext translation limit is exceeded* | Your organisation's Supertext volume is used up; contact your administrator. |

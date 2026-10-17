@@ -75,7 +75,7 @@ Articles must have a language of their own (not *All*) to be translated.
 
 ### Supertext languages and tone
 
-Each content language needs a **Supertext language**. Supertext accepts exactly these target codes (from its `features` list, October 2026):
+Each content language is sent to Supertext as a **Supertext language**. Supertext accepts exactly these target codes (from its `features` list, October 2026):
 
 | Language | Supertext codes |
 | --- | --- |
@@ -84,14 +84,24 @@ Each content language needs a **Supertext language**. Supertext accepts exactly 
 | Swiss German | `gsw-u-sd-chzh` (Zurich), `gsw-u-sd-chbe` (Bern) |
 | All others, without region | `bg`, `cs`, `da`, `el`, `es`, `fi`, `hr`, `hu`, `ja`, `ko`, `nb`, `nl`, `pl`, `rm`, `ru`, `sk`, `sl`, `sq`, `sv`, `tr` |
 
-- A content language whose tag **is** one of these codes (apart from upper/lower case) is sent as it is: `de-CH`, `fr-FR`, `it-IT`, `en-GB`.
-- **Every other content language needs a row on the plugin's Languages tab.** Joomla's tags always have a region, so this is the case for most languages outside German, English, French, Italian and Portuguese: `es-ES` → *Spanish — es*, `nl-NL` → *Dutch — nl*, `zh-CN` → *Chinese (Simplified) — zh-Hans*, `nb-NO` → *Norwegian Bokmål — nb*. The plugin never guesses: a language without a Supertext language is reported as *has no Supertext language yet* and nothing is sent for it.
-- A row can also send **another code** for a language Supertext has, e.g. `fr-CH` (Swiss French) for the `fr-FR` content language, and choose the **tone**: *Formal (Sie, vous)*, *Informal (du, tu)* or the Supertext default. Supertext offers no formal/informal choice for English, Swiss German, Romansh, Albanian and Serbian: leave those on *Default* (otherwise their translations fail with *Supertext offers no formal or informal tone for this language*).
-- The source language is sent without region: the article's language (or the code of its row) reduced to the language, `en-GB` → `en`, `de-CH` → `de`. One row serves both directions, so there is nothing to set up separately for translating *from* a language.
+On the plugin's **Languages** tab (*System → Manage → Plugins → System - Supertext Translation → Languages*) every content language, published or not, has its own row with a **Supertext language** list (each code with its name in your back-end language, e.g. *Spanish (es)*) and a **Tone** list. When nothing is saved for a language yet, the list preselects the suggested code:
 
-On the **Languages** tab, *Your content languages* shows every content language with the Supertext language it is sent as, **Not mapped** for those that still need a row, and a warning for a tone Supertext doesn't offer. Choosing a content language in a new row pre-selects its Supertext language if its tag is one; the *Supertext language* list shows every code above with its name.
+| Content language | Preselected (and used until you save another choice) |
+| --- | --- |
+| Tag that **is** a Supertext code (upper/lower case and `_`/`-` ignored) | That code: `de-CH`, `fr-FR`, `it-IT`, `en-GB` |
+| Bare German, English, French, Italian, Portuguese | `de` → `de-DE`, `en` → `en-US`, `fr` → `fr-FR`, `it` → `it-IT`, `pt` → `pt-PT` |
+| Chinese | `zh-CN`, `zh-SG`, `zh` → `zh-Hans`; `zh-TW`, `zh-HK`, `zh-MO` → `zh-Hant` |
+| Serbian | `sr`, `sr-Latn-RS` → `sr-Latn`; `sr-Cyrl-RS` → `sr-Cyrl` |
+| A region of a code Supertext has without region | `es-ES` → `es`, `nl-NL` → `nl`, `sl-SI` → `sl`, `nb-NO` → `nb` |
+| Anything else | Nothing: the list shows **— choose —** with a warning, e.g. `en-IE`, `de-LI`, `fr-BE`, `sr-RS`, `gsw` |
 
-<img src="images/plugin-languages.png" alt="Languages tab of the plugin: Your content languages lists English (en-GB) sent as en-GB, German (Switzerland) de-CH as de-CH, French (fr-FR) as fr-CH with the tone Formal (Sie, vous) and Italiano (it-IT) as it-IT; below, the row French (fr-FR) with the Supertext language French (Switzerland) and the tone Formal (Sie, vous)" width="720">
+- **Change the preselection** wherever you want another variant, e.g. `fr-CH` (Swiss French) for the `fr-FR` content language, then *Save*. Only codes from Supertext's list can be saved.
+- A language with **— choose —** can't be translated until you choose its Supertext language: its translations fail with *has no Supertext language yet* and nothing is sent. Supertext never gets a guessed region.
+- **Tone:** *Formal (Sie, vous)*, *Informal (du, tu)* or the Supertext default. The list is shown only for Supertext languages that offer it; English, Swiss German, Romansh, Albanian and Serbian have no formal/informal choice, so their row says so and sends the default.
+- **One choice serves both directions.** The source language is sent without region: the article's language (or its chosen code) reduced to the language, `en-GB` → `en`, `de-CH` → `de`.
+- Joomla keeps the mapping in the plugin's settings only; there is no environment variable for it.
+
+<img src="images/plugin-languages.png" alt="Languages tab of the plugin: one row per content language with its Supertext language list and tone, English (en-GB) as English (United Kingdom) (en-GB), German (Switzerland) as German (Switzerland) (de-CH), French (fr-FR) as French (Switzerland) (fr-CH) with the tone Formal (Sie, vous) and Italiano (it-IT) as Italian (Italy) (it-IT)" width="720">
 
 ## 4. Check it works
 
@@ -136,7 +146,7 @@ The plugin's dialog, settings and messages are available in English, German (`de
 | Status of new translations | Unpublished | Unpublished lets an editor review translations first; or Published |
 | Translate custom fields | Yes | Translate Text, Textarea and Editor custom fields; other custom fields are copied unchanged |
 | Send version information to Supertext | Yes | Site URL and versions to Supertext after saving and after updates (see [Version information and the API key check](#version-information-and-the-api-key-check)). The `SUPERTEXT_VERSION_REPORTS` environment variable (`0`/`1`) wins. |
-| Languages (tab) | – | Per content language: its Supertext language (needed for every content language whose tag isn't a Supertext code, see [Supertext languages and tone](#supertext-languages-and-tone)) and tone |
+| Languages (tab) | Suggested code per language | Per content language: its Supertext language (a list, preselected with the suggested code; *— choose —* where there is none, see [Supertext languages and tone](#supertext-languages-and-tone)) and tone |
 | Timeout (Advanced) | 180 s | Maximum wait for one translation |
 | Status check interval (Advanced) | 2 s | Time between status checks |
 
@@ -144,7 +154,7 @@ The plugin's dialog, settings and messages are available in English, German (`de
 
 Install the new package over the old one (*System → Install → Extensions*, or `extension:install`). Settings are kept. The next back-end page of the plugin reports the update to Supertext (if *Send version information* is on).
 
-**Updating from 0.1.0:** languages are no longer guessed. Content languages whose tag is a Supertext code (`de-CH`, `fr-FR`, `it-IT`, `en-GB`, …) work as before; for every other content language (e.g. `es-ES`, `nl-NL`, `zh-CN`) add a row on the *Languages* tab (see [Supertext languages and tone](#supertext-languages-and-tone)). *Your content languages* shows which ones are *Not mapped*. A *Supertext language code* you entered before stays selected; if it isn't a Supertext code (e.g. `es-ES`), it is marked *(not a Supertext code)*: choose the right one (`es`).
+**Updating from 0.1.0:** the *Languages* tab is now one row per content language with a list instead of rows you add yourself. The Supertext languages and tones you set before are kept: each row shows your saved choice, and the next *Save* stores it in the new form. Languages without a saved choice now use the suggested code (e.g. `es-ES` → `es`, `zh-CN` → `zh-Hans`, `de` → `de-DE`) instead of failing; only languages without a suggestion still need a choice. A saved code that isn't on Supertext's list is shown as *— choose —*: choose the right one.
 
 ## Uninstalling
 
@@ -158,13 +168,13 @@ Install the new package over the old one (*System → Install → Extensions*, o
 | *Authentication failed* | The key is wrong or revoked. Check it with **Test connection**; if needed, generate a new one at [supertext.com → Integrations → API](https://www.supertext.com/en/integrations/api) (Admin role required). |
 | *Supertext rejected the API key* (API key check) | Check that the whole key was copied, or generate a new one at [supertext.com → Integrations → API](https://www.supertext.com/en/integrations/api) (Admin role required). No Supertext account yet? [Create one](https://www.supertext.com/person/en/account/signin). Save, or click **Test connection**. |
 | *The API key couldn't be checked because Supertext can't be reached* | The web server can't reach `api.supertext.com` (firewall, proxy, DNS). Translations need the same connection. |
-| *The language … has no Supertext language yet* / *Not mapped* on the Languages tab | The content language's tag isn't a Supertext code: add a row for it on the plugin's *Languages* tab and choose its Supertext language (see [Supertext languages and tone](#supertext-languages-and-tone)). |
-| *Supertext offers no formal or informal tone for this language* | The row's tone is *Formal* or *Informal* for a language without that choice (English, Swiss German, Romansh, Albanian, Serbian): set it to *Default*. |
+| *The language … has no Supertext language yet* / *— choose —* on the Languages tab | The content language has no Supertext code and no suggestion (e.g. `en-IE`, `gsw`): choose its Supertext language in its row on the plugin's *Languages* tab and save (see [Supertext languages and tone](#supertext-languages-and-tone)). |
+| *Supertext offers no formal or informal tone for this language* | A tone saved before for a language without that choice (English, Swiss German, Romansh, Albanian, Serbian): open the *Languages* tab and save once, which resets it to the default. |
 | *Multilingual associations are switched off* | Set *Item Associations* to *Yes* in the *System - Language Filter* plugin (step 3). |
 | *This article's language is "All"* | Give the article a specific language first. |
 | *… is not a content language of this site* | The language was removed or unpublished; check *Content Languages*. |
 | *You are not allowed to create articles in the category used for …* | The user lacks *Create* permission there (see *Who can translate*). |
-| *Supertext does not support this language pair (en → xx-YY)* | The code sent isn't one Supertext offers for this source (e.g. a code marked *not a Supertext code* on the Languages tab, or the same language as the source). Choose a Supertext language from the list; the message shows the codes that were sent. |
+| *Supertext does not support this language pair (en → xx-YY)* | The code sent isn't one Supertext offers for this source (e.g. the same language as the source). Check the language's row on the *Languages* tab; the message shows the codes that were sent. |
 | *Too many requests to Supertext* | Supertext's per-second limit was still exceeded after 4 automatic retries. Wait a moment and translate again. |
 | *Your Supertext translation limit is exceeded* | Your Supertext plan's volume is used up. |
 | *Timed out waiting* | Very long articles: raise the *Timeout* (and PHP's `max_execution_time`). |
