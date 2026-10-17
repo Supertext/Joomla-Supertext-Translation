@@ -36,6 +36,13 @@ async function session(email, password) {
   await page.waitForTimeout(300)
   const shot = async (name, clip) => {
     await page.addStyleTag({ content: '*{animation:none!important;transition:none!important} .header .header-item-content .header-item-text{visibility:visible}' })
+    // Same image on every run: dates on screen (Date Created, "checked …" of the key check) are fixed.
+    await page.evaluate((fixed) => {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        n.nodeValue = n.nodeValue.replace(/\b\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?\b/g, (m, time) => fixed + (time ? ' 09:15' : ''))
+      }
+    }, '2026-10-13')
     await page.waitForTimeout(300)
     await page.screenshot({ path: `${OUT}/${name}.png`, ...(clip ? { clip } : {}) })
   }
