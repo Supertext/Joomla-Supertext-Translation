@@ -166,6 +166,29 @@ CI (`.github/workflows/ci.yml`) on every push and pull request:
 - **PHPStan**: level 5 against a downloaded Joomla (see *Code quality and security checks*).
 - **joomla**: installs Joomla 6.1 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database. The stand-in also plays the Commando Center (`SUPERTEXT_REPORT_URL`): the job checks the one `installed` report (plugin, Joomla version, callback URL, no key) and the public ping through `php -S` on a site with the Language Filter on.
 
+`.github/workflows/checks.yml` and `links.yml` lint the workflows and check the links. `.github/workflows/e2e.yml` runs the end-to-end test against the real Supertext API and regenerates the docs screenshots (see *End-to-end tests*).
+
+## End-to-end tests
+
+The unit tests and the CI job *joomla* use the stand-in API. `.github/workflows/e2e.yml` also tests against the **real Supertext API**, so changes on Supertext's side (language codes, regional variants, formatting, rate limits) show up. It runs on every push to `main` that touches the plugin, the demo or the tests, on pull requests that change the E2E test or workflow, every Monday (05:27 UTC), and by hand (*Actions → E2E → Run workflow*). It builds the demo image once (Docker layer cache in GitHub Actions) and starts it twice on a PostgreSQL service, each with a new database (`JOOMLA_DB_NAME`) and demo accounts made up for the run:
+
+1. **Real API** (repository or organization secret `SUPERTEXT_API_KEY`; without it these steps are skipped with a warning). Version reports are off (`SUPERTEXT_VERSION_REPORTS=0`), so CI runs don't appear in the Commando Center.
+   - `tests/e2e/features.mjs` asks the live `GET features` (cost-free, no plugin or SDK code) whether every pair the demo translates (`en` → `de-CH`, `fr-FR`, `it-IT`, the demo's content languages as the plugin sends them) is offered; a missing pair fails the run. Whether the plugin's own language list matches the API is the SDK's job (its own tests).
+   - `tests/e2e/live.mjs` (Playwright): the editor account (`DEMO_EDITOR_*`, a Manager) selects every English article in *Content → Articles*, opens the **Supertext** dialog and translates them into every other content language, then the database is checked: every article has exactly one associated translation per language, unpublished; every translated field (title, intro and full text, meta description and keywords, image alt texts and captions, link texts) is filled and at least 80 % of them changed (a single word like "Bern" can stay the same); no `data-st-id`/placeholder is left; links (with their `href`), bold, italics, list items, headings and Joomla plugin tags (`{loadposition …}`) are kept; the text is in the target language (common words of each language counted) and de-CH has no "ß"; the dialog and the Articles list show no error. Then it translates again with *overwrite*: the overwrite warning must appear and the same articles must be updated (no duplicates). Each run translates the two sample articles twice into three languages (around 4,000 characters on the key's account).
+2. **Stand-in API**: the docs screenshots (see *Docs screenshots*), so the images don't change with each machine translation. If `docs/images/` changed, a second job pushes the branch `automation/docs-screenshots` and opens (or updates) the pull request "Docs: regenerate screenshots". This needs *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
+
+If a run fails, the artifact `e2e-debug` has the result pages, the demo containers' logs (and Joomla's `administrator/logs`) and the stand-in log. Locally:
+
+```bash
+cd tests/e2e && npm install && npx playwright install chromium
+# a fresh demo (new database) with a real SUPERTEXT_API_KEY, e.g. on port 8081
+SUPERTEXT_API_KEY=… E2E_SOURCE=en E2E_TARGETS=de-CH,fr-FR,it-IT node features.mjs
+JOOMLA_URL=http://127.0.0.1:8081 DATABASE_URL=postgresql://user:pass@127.0.0.1:5432/joomla \
+  EDITOR_EMAIL=… EDITOR_PASSWORD=… npm run live
+```
+
+`DB_PREFIX` (default `jos_`) and `SOURCE_LANGUAGE` (default `en-GB`) match the demo's defaults. `live.mjs` also passes against the stand-in API (it returns real translations for the sample articles), which is how to try changes to it without a key.
+
 ## Demo (Railway)
 
 The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production-096c.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
@@ -217,7 +240,7 @@ docker run --rm -p 8080:80 \
 The images in `docs/images/` are generated by `tests/docs/screenshots.mjs` (Playwright) from a freshly set-up demo whose plugin talks to `tests/docs/stand-in.mjs`. The stand-in returns German, French and Italian for the sample articles (`samples.json`, real Supertext output). Regenerate them whenever a screen they show changes:
 
 ```bash
-cd tests/docs && npm install && npx playwright install chromium
+cd tests/docs && npm ci && npx playwright install chromium
 npm run stand-in &
 # a fresh demo (entrypoint or the local setup above, with supertext:demo-setup and DEMO_* set),
 # served with SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/, SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report
@@ -227,7 +250,7 @@ BASE_URL=http://127.0.0.1:8092 DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… \
   DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… npm run screenshots
 ```
 
-Start from a database without translations of the sample articles. The script saves the settings twice (the key, then a Languages row `fr-FR` → `fr-CH`, formal) and shows the ping address with the public demo's URL (`PUBLIC_URL`) instead of the local one.
+Start from a database without translations of the sample articles. Dates on screen (*Date Created*, the key check's "checked …") are replaced with a fixed date before each screenshot, so the images only change when the UI does. The E2E workflow (see *End-to-end tests*) runs the script against the stand-in and opens a pull request when the images changed. The script saves the settings twice (the key, then a Languages row `fr-FR` → `fr-CH`, formal) and shows the ping address with the public demo's URL (`PUBLIC_URL`) instead of the local one.
 
 ## Code quality and security checks
 
