@@ -52,6 +52,8 @@ If an article already has a translation in a language, the dialog marks it **Alr
 - **Off** (default): only the languages without a translation are translated; existing ones are skipped.
 - **On**: the existing translation is replaced with a fresh translation of the current original. Edits made to the translation are lost. Its URL alias, category, status and other settings stay as they are.
 
+**Translation review:** if your administrator turned on *Translation review* for a language, reviewers (your colleagues or Supertext linguists) check and correct the translations on the website. Their corrections come into Joomla the next time you translate the article into that language: after a review, translate it again with **Overwrite existing translations** on. Texts reviewed once keep their corrected wording in later translations.
+
 <img src="images/overwrite-warning.png" alt="Dialog with German (Switzerland) ticked and marked Already translated, and the warning Overwrite existing translations: changes made to those translations will be replaced; their URL, category and status stay as they are" width="576">
 
 ## Export for translation and import the translated file

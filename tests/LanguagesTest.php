@@ -151,13 +151,13 @@ final class LanguagesTest extends TestCase
 
     public function testSettingsReadTheCurrentFormat(): void
     {
-        $stored = (object) ['es-ES' => (object) ['code' => 'es', 'politeness' => 'more'], 'fr-FR' => (object) ['code' => 'fr-CH']];
+        $stored = (object) ['es-ES' => (object) ['code' => 'es', 'politeness' => 'more', 'review' => true], 'fr-FR' => (object) ['code' => 'fr-CH']];
 
         self::assertSame(
-            ['es-ES' => ['code' => 'es', 'politeness' => 'more'], 'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'default']],
+            ['es-ES' => ['code' => 'es', 'politeness' => 'more', 'review' => true], 'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'default', 'review' => false]],
             Languages::settings($stored),
         );
-        self::assertSame(['de-CH' => ['code' => 'de-CH', 'politeness' => 'less']], Languages::settings('{"de-CH":{"code":"de-CH","politeness":"less"}}'));
+        self::assertSame(['de-CH' => ['code' => 'de-CH', 'politeness' => 'less', 'review' => false]], Languages::settings('{"de-CH":{"code":"de-CH","politeness":"less"}}'), 'Translation review is off unless saved on');
         self::assertSame([], Languages::settings(null));
         self::assertSame([], Languages::settings(''));
     }
@@ -173,9 +173,9 @@ final class LanguagesTest extends TestCase
 
         self::assertSame(
             [
-                'es-ES' => ['code' => 'es', 'politeness' => 'default'],
-                'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'more'],
-                'en-GB' => ['code' => '', 'politeness' => 'default'],
+                'es-ES' => ['code' => 'es', 'politeness' => 'default', 'review' => false],
+                'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'more', 'review' => false],
+                'en-GB' => ['code' => '', 'politeness' => 'default', 'review' => false],
             ],
             Languages::settings($stored),
         );
@@ -184,8 +184,8 @@ final class LanguagesTest extends TestCase
     public function testCleanKeepsOnlySupertextCodesAndTonesTheyOffer(): void
     {
         $posted = [
-            'es-ES'  => ['code' => 'ES', 'politeness' => 'more'],
-            'en-GB'  => ['code' => 'en-GB', 'politeness' => 'more'],
+            'es-ES'  => ['code' => 'ES', 'politeness' => 'more', 'review' => '1'],
+            'en-GB'  => ['code' => 'en-GB', 'politeness' => 'more', 'review' => '0'],
             'fr-FR'  => ['code' => 'fr-ch', 'politeness' => 'less'],
             'de-CH'  => ['code' => 'xx-YY', 'politeness' => 'more'],
             'en-IE'  => ['code' => '', 'politeness' => 'more'],
@@ -194,11 +194,11 @@ final class LanguagesTest extends TestCase
 
         self::assertSame(
             [
-                'es-ES' => ['code' => 'es', 'politeness' => 'more'],
-                'en-GB' => ['code' => 'en-GB', 'politeness' => 'default'],
-                'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'less'],
-                'de-CH' => ['code' => '', 'politeness' => 'default'],
-                'en-IE' => ['code' => '', 'politeness' => 'default'],
+                'es-ES' => ['code' => 'es', 'politeness' => 'more', 'review' => true],
+                'en-GB' => ['code' => 'en-GB', 'politeness' => 'default', 'review' => false],
+                'fr-FR' => ['code' => 'fr-CH', 'politeness' => 'less', 'review' => false],
+                'de-CH' => ['code' => '', 'politeness' => 'default', 'review' => false],
+                'en-IE' => ['code' => '', 'politeness' => 'default', 'review' => false],
             ],
             Languages::clean($posted),
         );

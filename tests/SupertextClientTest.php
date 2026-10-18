@@ -12,7 +12,7 @@ final class SupertextClientTest extends TestCase
     private array $calls = [];
 
     /** @param callable(string, string, ?string): array{status: int, body: string, headers?: array<string, string>} $handler */
-    private function client(callable $handler, string $key = 'test-key'): SupertextClient
+    private function client(callable $handler, string $key = 'test-key', string $reviewUrl = '', string $version = ''): SupertextClient
     {
         $transport = function (string $method, string $url, array $headers, ?string $body) use ($handler): array {
             $this->calls[] = compact('method', 'url', 'headers', 'body');
@@ -21,7 +21,86 @@ final class SupertextClientTest extends TestCase
         };
 
         return new SupertextClient($key, 'https://api.test/v1', $transport, 10, 0.01, static function (): void {
-        });
+        }, $reviewUrl, $version);
+    }
+
+    /** Answers every step of the protocol at once. */
+    private static function fakeSupertext(string $method, string $url): array
+    {
+        return match (true) {
+            $method === 'POST'                  => ['status' => 200, 'body' => '{"file_id":"f1"}'],
+            str_ends_with($url, '/status')      => ['status' => 200, 'body' => '{"status":"done"}'],
+            str_ends_with($url, '/translation') => ['status' => 200, 'body' => '<div data-st-id="0">Hallo</div>'],
+            default                             => ['status' => 200, 'body' => '{}'],
+        };
+    }
+
+    /** @return array<string, list<string>> host => methods called there */
+    private function callsByHost(): array
+    {
+        $hosts = [];
+        foreach ($this->calls as $call) {
+            $hosts[(string) parse_url($call['url'], PHP_URL_HOST)][] = $call['method'];
+        }
+
+        return $hosts;
+    }
+
+    public function testTranslationReviewGoesThroughTheReviewService(): void
+    {
+        $client = $this->client(self::fakeSupertext(...), reviewUrl: 'https://review.test/v1/');
+
+        self::assertSame($client, $client->forReview(false));
+        $review = $client->forReview(true);
+        self::assertNotSame($client, $review);
+        self::assertSame($review, $client->forReview(true), 'one review client');
+
+        // German with review, French without.
+        self::assertSame([0 => 'Hallo'], $review->translateSegments([['text' => 'Hello', 'html' => false]], 'de-CH', 'en'));
+        self::assertSame([0 => 'Hallo'], $client->forReview(false)->translateSegments([['text' => 'Hello', 'html' => false]], 'fr-CH', 'en'));
+
+        self::assertSame(
+            ['review.test' => ['POST', 'GET', 'GET', 'DELETE'], 'api.test' => ['POST', 'GET', 'GET', 'DELETE']],
+            $this->callsByHost(),
+            'upload, status, download and delete through the review service for the review language only'
+        );
+        self::assertSame('https://review.test/v1/translate/ai/file', $this->calls[0]['url']);
+        self::assertSame('Supertext-Auth-Key test-key', $this->calls[0]['headers']['Authorization'], 'same key');
+
+        $this->calls = [];
+        $client->checkApiKey();
+        $review->checkApiKey();
+        self::assertSame(['api.test' => ['GET'], 'review.test' => ['GET']], $this->callsByHost());
+    }
+
+    public function testTranslationReviewIsOffWithoutAReviewUrl(): void
+    {
+        $client = $this->client(self::fakeSupertext(...));
+        self::assertSame($client, $client->forReview(true), 'empty review URL: review off for every language');
+
+        $client = $this->client(self::fakeSupertext(...), reviewUrl: 'https://api.test/v1/');
+        self::assertSame($client, $client->forReview(true), 'same URL as the API: no second client');
+    }
+
+    public function testTheReviewServiceIsTheDefaultSetting(): void
+    {
+        $xml = simplexml_load_file(\dirname(__DIR__) . '/plugin/supertext.xml');
+        self::assertNotFalse($xml);
+        $field = $xml->xpath('//field[@name="review_url"]');
+        self::assertNotEmpty($field);
+        self::assertSame(SupertextClient::REVIEW_URL, (string) $field[0]['default']);
+        self::assertSame('https://localizationreview-production.up.railway.app/v1/', SupertextClient::REVIEW_URL);
+    }
+
+    public function testTheUserAgentNamesThePluginVersion(): void
+    {
+        $client = $this->client(self::fakeSupertext(...), reviewUrl: 'https://review.test/v1/', version: '1.2.3');
+        $client->validateApiKey();
+        $client->forReview(true)->validateApiKey();
+
+        foreach ($this->calls as $call) {
+            self::assertStringContainsString('Joomla-Supertext-Translation/1.2.3', $call['headers']['User-Agent'] ?? '');
+        }
     }
 
     public function testRunsTheFullProtocol(): void

@@ -31,6 +31,7 @@
 					<option value="testing">PLG_SYSTEM_SUPERTEXT_ENVIRONMENT_TESTING</option>
 				</field>
 				<field name="endpoint" type="url" label="PLG_SYSTEM_SUPERTEXT_ENDPOINT" description="PLG_SYSTEM_SUPERTEXT_ENDPOINT_DESC" filter="url" validate="url" />
+				<field name="review_url" type="url" label="PLG_SYSTEM_SUPERTEXT_REVIEW_URL" description="PLG_SYSTEM_SUPERTEXT_REVIEW_URL_DESC" default="https://localizationreview-production.up.railway.app/v1/" filter="url" validate="url" />
 				<field name="target_state" type="list" label="PLG_SYSTEM_SUPERTEXT_TARGET_STATE" description="PLG_SYSTEM_SUPERTEXT_TARGET_STATE_DESC" default="0" filter="integer" validate="options">
 					<option value="0">JUNPUBLISHED</option>
 					<option value="1">JPUBLISHED</option>

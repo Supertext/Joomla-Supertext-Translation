@@ -33,6 +33,14 @@ final class SupertextClient
     public const STAGING = 'https://api.staging.supertext.com/v1/';
     public const TESTING = 'https://api.testing.supertext.com/v1/';
 
+    /**
+     * Supertext's review service (the translation proxy of Supertext Localization Review). It
+     * speaks the same API v1 and forwards to the live Supertext API with the plugin's key,
+     * keeping every translation so reviewers can correct them on the website; corrections come
+     * back with the next upload. Used for content languages with *Translation review* on.
+     */
+    public const REVIEW_URL = 'https://localizationreview-production.up.railway.app/v1/';
+
     /** Stay well below the API's 1,000,000 character limit per document. */
     public const MAX_DOCUMENT_CHARACTERS = Protocol::DEFAULT_MAX_CHARACTERS;
 
@@ -60,9 +68,16 @@ final class SupertextClient
     private readonly Client $sdk;
     private readonly string $apiKey;
 
+    /** @var \Closure(): self|null builds the client for the review service (null: review off) */
+    private readonly ?\Closure $makeReviewClient;
+
+    private ?self $reviewClient = null;
+
     /**
      * @param callable(string $method, string $url, array<string, string> $headers, ?string $body): array{status: int, body: string, headers: array<string, string>} $transport
      * @param callable(float $seconds): void|null $sleep tests: the SDK's clock then counts the slept time
+     * @param string $reviewUrl the review service for languages with Translation review on ('' = review off)
+     * @param string $version   the plugin's version, sent in the User-Agent
      */
     public function __construct(
         string $apiKey,
@@ -71,8 +86,17 @@ final class SupertextClient
         private readonly int $pollTimeout = 180,
         float $pollInterval = 2.0,
         ?callable $sleep = null,
+        string $reviewUrl = '',
+        string $version = '',
     ) {
         $this->apiKey = self::normalizeKey($apiKey);
+        $baseUrl      = $baseUrl !== '' ? $baseUrl : self::LIVE;
+        $reviewUrl    = trim($reviewUrl);
+
+        // Same key, transport, timeouts and User-Agent; only the base URL differs.
+        $this->makeReviewClient = $reviewUrl === '' || rtrim($reviewUrl, '/') === rtrim($baseUrl, '/')
+            ? null
+            : static fn (): self => new self($apiKey, $reviewUrl, $transport, $pollTimeout, $pollInterval, $sleep, '', $version);
 
         $elapsed = 0.0;
         $sdkSleep = $sleep === null ? null : static function (float $seconds) use ($sleep, &$elapsed): void {
@@ -85,11 +109,12 @@ final class SupertextClient
 
         $this->sdk = new Client(
             $this->apiKey,
-            baseUrl: $baseUrl !== '' ? $baseUrl : self::LIVE,
+            baseUrl: $baseUrl,
             pollInterval: $pollInterval,
             timeout: (float) $pollTimeout,
             requestTimeout: 60.0,
-            userAgent: 'Joomla-Supertext-Translation',
+            // The plugin's version too, so Supertext and the review service see which release calls.
+            userAgent: Reporting::PLUGIN_NAME . ($version !== '' ? '/' . $version : ''),
             transport: new CallableTransport($transport),
             sleep: $sdkSleep,
             clock: $clock,
@@ -118,6 +143,20 @@ final class SupertextClient
     public function hasApiKey(): bool
     {
         return $this->apiKey !== '';
+    }
+
+    /**
+     * The client for a target language: the review service when its *Translation review* is on
+     * (same key, same protocol; created once), else this one. Without a review URL always this
+     * one. The key check and the version reports always use this one.
+     */
+    public function forReview(bool $review): self
+    {
+        if (!$review || $this->makeReviewClient === null) {
+            return $this;
+        }
+
+        return $this->reviewClient ??= ($this->makeReviewClient)();
     }
 
     /**

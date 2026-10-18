@@ -558,7 +558,7 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
     /**
      * The Languages tab (both the current format and the rows of 0.1.0, see Languages::settings()).
      *
-     * @return array<string, array{code: string, politeness: string}> keyed by content language tag
+     * @return array<string, array{code: string, politeness: string, review: bool}> keyed by content language tag
      */
     private function languageSettings(): array
     {
@@ -629,6 +629,21 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
         };
     }
 
+    /**
+     * The review service for languages with Translation review on: SUPERTEXT_REVIEW_URL, else the
+     * setting (never saved: Supertext's review service; saved empty: review off everywhere).
+     */
+    private function reviewUrl(): string
+    {
+        $env = getenv('SUPERTEXT_REVIEW_URL');
+
+        if (\is_string($env) && trim($env) !== '') {
+            return trim($env);
+        }
+
+        return $this->params->exists('review_url') ? trim((string) $this->params->get('review_url', '')) : SupertextClient::REVIEW_URL;
+    }
+
     private function client(string $key): SupertextClient
     {
         return new SupertextClient(
@@ -637,6 +652,8 @@ final class Supertext extends CMSPlugin implements SubscriberInterface
             $this->transport(),
             max(10, (int) $this->params->get('poll_timeout', 180)),
             max(0.5, (float) $this->params->get('poll_interval', 2)),
+            reviewUrl: $this->reviewUrl(),
+            version: Reporting::pluginVersion(\dirname(__DIR__, 2) . '/supertext.xml'),
         );
     }
 }

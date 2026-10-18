@@ -56,8 +56,8 @@ final class ArticleTranslator
     private const HTML_FIELD_TYPES  = ['editor'];
 
     /**
-     * @param array<string, array{code?: string, politeness?: string}> $languageSettings  keyed by Joomla language tag: the
-     *        Supertext code (the mapping, see Api\Languages) and tone from the plugin's Languages tab
+     * @param array<string, array{code?: string, politeness?: string, review?: bool}> $languageSettings  keyed by Joomla language tag: the
+     *        Supertext code (the mapping, see Api\Languages), tone and Translation review from the plugin's Languages tab
      */
     public function __construct(
         private readonly CMSApplicationInterface $app,
@@ -250,7 +250,10 @@ final class ArticleTranslator
         [$target, $catid] = $this->prepareTarget($article, $tag, $existingId, $user);
         [$fields, $customFields] = $this->collect($article);
 
-        return $this->save($article, $tag, $target, $catid, $customFields, $this->translateFields($fields, $code, $source, $politeness), $user, false);
+        // Languages with Translation review on go through Supertext's review service.
+        $client = $this->client->forReview((bool) ($this->languageSettings[$tag]['review'] ?? false));
+
+        return $this->save($article, $tag, $target, $catid, $customFields, $this->translateFields($client, $fields, $code, $source, $politeness), $user, false);
     }
 
     /**
@@ -428,7 +431,7 @@ final class ArticleTranslator
      *
      * @return array<string, string> key => translation (only for non-empty fields that came back)
      */
-    private function translateFields(array $fields, string $code, string $source, string $politeness): array
+    private function translateFields(SupertextClient $client, array $fields, string $code, string $source, string $politeness): array
     {
         $keys     = [];
         $segments = [];
@@ -449,7 +452,7 @@ final class ArticleTranslator
         $out = [];
 
         // The Supertext SDK packs the segments into documents below the size limit.
-        foreach ($this->client->translateSegments($segments, $code, $source, $politeness) as $i => $translation) {
+        foreach ($client->translateSegments($segments, $code, $source, $politeness) as $i => $translation) {
             if (isset($keys[$i]) && trim(strip_tags($translation)) !== '') {
                 $out[$keys[$i]] = $translation;
             }

@@ -26,6 +26,8 @@ use Supertext\Plugin\System\Supertext\Api\Languages;
  * suggested code (Languages::suggest(): the exact code, else the SDK's default: de-DE for
  * de, es for es-ES), else "— choose —" with a warning: such a language can't be translated
  * until a code is chosen. The tone is offered only where the chosen code has formal/informal.
+ * *Translation review* (a checkbox, off by default) sends translations into the language
+ * through Supertext's review service (SupertextClient::forReview()).
  * Saving keeps only codes from Supertext's list (filter()). Settings of a language that is no
  * longer a content language are kept as hidden values.
  */
@@ -49,6 +51,7 @@ final class LanguagemappingField extends FormField
                 . '<th scope="col">' . Text::_('PLG_SYSTEM_SUPERTEXT_LANGUAGE_STATUS_LANGUAGE') . '</th>'
                 . '<th scope="col">' . Text::_('PLG_SYSTEM_SUPERTEXT_LANGUAGE_CODE') . '</th>'
                 . '<th scope="col">' . Text::_('PLG_SYSTEM_SUPERTEXT_POLITENESS') . '</th>'
+                . '<th scope="col">' . Text::_('PLG_SYSTEM_SUPERTEXT_REVIEW') . '</th>'
                 . '</tr></thead><tbody>';
 
             foreach ($languages as $tag => $language) {
@@ -58,6 +61,7 @@ final class LanguagemappingField extends FormField
                 $selected = $selected !== '' ? (Languages::exactTarget($selected) ?? '') : '';
                 $tone     = $saved[$tag]['politeness'] ?? 'default';
                 $polite   = $selected !== '' && Languages::supportsPoliteness($selected) === true;
+                $review   = $saved[$tag]['review'] ?? false;
                 $name     = $this->name . '[' . $e($tag) . ']';
 
                 $html .= '<tr><th scope="row"><label for="' . $e($id) . '_code">' . $e((string) $language->title) . '</label> <code>' . $e($tag) . '</code></th><td>'
@@ -80,10 +84,14 @@ final class LanguagemappingField extends FormField
                 }
 
                 $html .= '</select><span class="text-muted small" data-supertext-no-tone' . ($polite || $selected === '' ? ' hidden' : '') . '>'
-                    . Text::_('PLG_SYSTEM_SUPERTEXT_LANGUAGE_NO_POLITENESS') . '</span></td></tr>';
+                    . Text::_('PLG_SYSTEM_SUPERTEXT_LANGUAGE_NO_POLITENESS') . '</span></td><td>'
+                    . '<input type="hidden" name="' . $name . '[review]" value="0">'
+                    . '<div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="' . $e($id) . '_review" name="' . $name . '[review]" value="1"'
+                    . ($review ? ' checked' : '') . ' aria-label="' . $e(Text::_('PLG_SYSTEM_SUPERTEXT_REVIEW') . ': ' . $language->title) . '"></div></td></tr>';
             }
 
-            $html .= '</tbody></table>';
+            $html .= '</tbody></table>'
+                . '<p class="small text-muted"><strong>' . Text::_('PLG_SYSTEM_SUPERTEXT_REVIEW') . ':</strong> ' . Text::_('PLG_SYSTEM_SUPERTEXT_REVIEW_DESC') . '</p>';
         }
 
         // Settings of languages that are no longer content languages (e.g. trashed) stay as they are.
@@ -91,7 +99,8 @@ final class LanguagemappingField extends FormField
             if (!isset($languages[$tag])) {
                 $name = $this->name . '[' . $e($tag) . ']';
                 $html .= '<input type="hidden" name="' . $name . '[code]" value="' . $e($row['code']) . '">'
-                    . '<input type="hidden" name="' . $name . '[politeness]" value="' . $e($row['politeness']) . '">';
+                    . '<input type="hidden" name="' . $name . '[politeness]" value="' . $e($row['politeness']) . '">'
+                    . '<input type="hidden" name="' . $name . '[review]" value="' . ($row['review'] ? '1' : '0') . '">';
             }
         }
 

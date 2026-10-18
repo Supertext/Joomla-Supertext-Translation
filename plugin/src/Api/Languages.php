@@ -33,12 +33,12 @@ final class Languages
     private const TONES = ['default', 'more', 'less'];
 
     /**
-     * The saved Languages tab as tag → {code, politeness}. Reads the current format (keyed by
+     * The saved Languages tab as tag → {code, politeness, review}. Reads the current format (keyed by
      * content language tag) and the repeatable rows of plugin versions up to 0.1.0
      * ({"languages0": {"language": "es-ES", "code": "es", ...}}), so an upgrade loses nothing:
-     * the next save writes the current format.
+     * the next save writes the current format. `review` (Translation review) is off unless saved on.
      *
-     * @return array<string, array{code: string, politeness: string}>
+     * @return array<string, array{code: string, politeness: string, review: bool}>
      */
     public static function settings(mixed $stored): array
     {
@@ -66,6 +66,7 @@ final class Languages
             $settings[$tag] = [
                 'code'       => trim((string) ($row['code'] ?? '')),
                 'politeness' => \in_array($row['politeness'] ?? null, self::TONES, true) ? (string) $row['politeness'] : 'default',
+                'review'     => \in_array($row['review'] ?? false, [true, 1, '1', 'true', 'on'], true),
             ];
         }
 
@@ -75,9 +76,9 @@ final class Languages
     /**
      * The Languages tab as posted, validated for saving: tags that look like language tags,
      * codes only from Supertext's list (written as the list writes them, else ""), a formal or
-     * informal tone only where the chosen code offers it.
+     * informal tone only where the chosen code offers it, Translation review on or off.
      *
-     * @return array<string, array{code: string, politeness: string}>
+     * @return array<string, array{code: string, politeness: string, review: bool}>
      */
     public static function clean(mixed $posted): array
     {
@@ -91,7 +92,7 @@ final class Languages
             $code       = $row['code'] !== '' ? (SdkLanguages::matchTarget($row['code']) ?? '') : '';
             $politeness = $code !== '' && SdkLanguages::supportsPoliteness($code) === true ? $row['politeness'] : 'default';
 
-            $clean[$tag] = ['code' => $code, 'politeness' => $politeness];
+            $clean[$tag] = ['code' => $code, 'politeness' => $politeness, 'review' => $row['review']];
         }
 
         return $clean;
@@ -106,7 +107,7 @@ final class Languages
     /**
      * The mapping from the plugin's Languages tab: content language tag → Supertext code (rows without a code are left out).
      *
-     * @param array<string, array{code?: string, politeness?: string}> $settings keyed by Joomla language tag
+     * @param array<string, array{code?: string, politeness?: string, review?: bool}> $settings keyed by Joomla language tag
      *
      * @return array<string, string>
      */

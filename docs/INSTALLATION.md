@@ -15,7 +15,7 @@ A ready-to-run container with Joomla 6.1, English sample articles, German (Switz
 | Database | Any database Joomla supports (MySQL, MariaDB, PostgreSQL) |
 | Joomla setup | A multilingual site: at least two content languages and *Item Associations* switched on (step 3) |
 | Supertext | An account with an API key, see [Get a Supertext account and API key](#get-a-supertext-account-and-api-key) |
-| Network | The web server must reach `https://api.supertext.com` over HTTPS |
+| Network | The web server must reach `https://api.supertext.com` over HTTPS (and, for [Translation review](#translation-review), Supertext's review service) |
 
 ## 1. Install the plugin
 
@@ -48,7 +48,7 @@ The plugin settings link to both pages, next to the API key field.
 2. Click **Modify** next to *Supertext API key*, paste your key and click **Save**. You can paste it exactly as Supertext shows it, with the leading `Supertext-Auth-Key`, or without it.
 3. Saving checks the key with Supertext right away (a cost-free call, nothing is translated) and shows the result at the top of the page and under **API key check**: *API key checked: the connection to Supertext works.* means everything is in place. **Test connection** runs the same check again at any time.
 
-<img src="images/plugin-settings.png" alt="Plugin settings: Supertext API key (hidden), API key check with the message API key checked: the connection to Supertext works. and its time, the Test connection button, API environment Live, an empty custom API base URL, new translations Unpublished, translate custom fields Yes, Send version information to Supertext Yes with what it sends and the ping address" width="720">
+<img src="images/plugin-settings.png" alt="Plugin settings: Supertext API key (hidden), API key check with the message API key checked: the connection to Supertext works. and its time, the Test connection button, API environment Live, an empty custom API base URL, the review service URL with Supertext's review service, new translations Unpublished, translate custom fields Yes, Send version information to Supertext Yes with what it sends and the ping address" width="720">
 
 The key stays saved when you change other settings later (the field is locked until you click **Modify**; clear it after **Modify** to remove the key).
 
@@ -84,7 +84,7 @@ Each content language is sent to Supertext as a **Supertext language**. Supertex
 | Swiss German | `gsw-u-sd-chzh` (Zurich), `gsw-u-sd-chbe` (Bern) |
 | All others, without region | `bg`, `cs`, `da`, `el`, `es`, `fi`, `hr`, `hu`, `ja`, `ko`, `nb`, `nl`, `pl`, `rm`, `ru`, `sk`, `sl`, `sq`, `sv`, `tr` |
 
-On the plugin's **Languages** tab (*System → Manage → Plugins → System - Supertext Translation → Languages*) every content language, published or not, has its own row with a **Supertext language** list (each code with its name in your back-end language, e.g. *Spanish (es)*) and a **Tone** list. When nothing is saved for a language yet, the list preselects the suggested code:
+On the plugin's **Languages** tab (*System → Manage → Plugins → System - Supertext Translation → Languages*) every content language, published or not, has its own row with a **Supertext language** list (each code with its name in your back-end language, e.g. *Spanish (es)*), a **Tone** list and a **Translation review** switch (off by default, see [Translation review](#translation-review)). When nothing is saved for a language yet, the list preselects the suggested code:
 
 | Content language | Preselected (and used until you save another choice) |
 | --- | --- |
@@ -99,9 +99,24 @@ On the plugin's **Languages** tab (*System → Manage → Plugins → System - S
 - A language with **— choose —** can't be translated until you choose its Supertext language: its translations fail with *has no Supertext language yet* and nothing is sent. Supertext never gets a guessed region.
 - **Tone:** *Formal (Sie, vous)*, *Informal (du, tu)* or the Supertext default. The list is shown only for Supertext languages that offer it; English, Swiss German, Romansh, Albanian and Serbian have no formal/informal choice, so their row says so and sends the default.
 - **One choice serves both directions.** The source language is sent without region: the article's language (or its chosen code) reduced to the language, `en-GB` → `en`, `de-CH` → `de`.
+- **Translation review:** on or off per language, see [Translation review](#translation-review).
 - Joomla keeps the mapping in the plugin's settings only; there is no environment variable for it.
 
-<img src="images/plugin-languages.png" alt="Languages tab of the plugin: one row per content language with its Supertext language list and tone, English (en-GB) as English (United Kingdom) (en-GB), German (Switzerland) as German (Switzerland) (de-CH), French (fr-FR) as French (Switzerland) (fr-CH) with the tone Formal (Sie, vous) and Italiano (it-IT) as Italian (Italy) (it-IT)" width="720">
+<img src="images/plugin-languages.png" alt="Languages tab of the plugin: one row per content language with its Supertext language list, tone and Translation review switch (all off), English (en-GB) as English (United Kingdom) (en-GB), German (Switzerland) as German (Switzerland) (de-CH), French (fr-FR) as French (Switzerland) (fr-CH) with the tone Formal (Sie, vous) and Italiano (it-IT) as Italian (Italy) (it-IT)" width="720">
+
+### Translation review
+
+With **Translation review**, people check the translations on the website itself and correct them there: customers or Supertext linguists open the original and the translated page side by side in Chrome with the *Supertext Localization Review* extension and fix texts in a side panel. Their corrections come back into Joomla.
+
+Turn it on per language that is translated **into**: *System → Manage → Plugins → System - Supertext Translation → Languages*, switch on **Translation review** in the language's row (e.g. *German (Switzerland)*) and *Save*. Switch it off to turn it off again; nothing else changes.
+
+- Translations into that language then go through Supertext's review service instead of directly to Supertext. It answers exactly like Supertext and passes everything on with your API key, so billing, languages, tone and error messages stay the same. Other languages keep going directly to Supertext.
+- The review service keeps every translation of your account. A text it has translated before gets the same translation again (without a new Supertext call), and once a reviewer has corrected it, the corrected text.
+- **Corrections arrive with the next translation:** after a review, translate the articles again (*Supertext* → *Overwrite existing translations*) to write the corrections into Joomla. As always, overwriting replaces manual changes in the translated articles.
+- Reviewers get a review link for your site from Supertext; nothing to set up in Joomla.
+- The review service works with keys of the **live** Supertext API. With the *Staging* or *Testing* environment (or a *Custom API base URL*), leave review off.
+- *Export for translation* and *Import translation* don't use the review service. The API key check (*Test connection*, and on saving) and the version reports still go directly to Supertext.
+- The address of the review service is the setting *Review service URL* (see [All settings](#all-settings)); empty turns review off for every language.
 
 ## 4. Check it works
 
@@ -146,17 +161,18 @@ The plugin's dialog, settings and messages are available in English, German (`de
 | --- | --- | --- |
 | Supertext API key | – | Your key, with or without the `Supertext-Auth-Key` prefix. The `SUPERTEXT_API_KEY` environment variable wins. |
 | API environment | Live | `Live`, `Staging` or `Testing` Supertext API |
-| Custom API base URL | – | Overrides the environment (e.g. a test server). The `SUPERTEXT_API_ENDPOINT` environment variable wins. |
+| Custom API base URL | – | Overrides the environment (e.g. a test server). The `SUPERTEXT_API_ENDPOINT` environment variable wins. For [Translation review](#translation-review) use the switch on the *Languages* tab instead. |
+| Review service URL | Supertext's review service (`https://localizationreview-production.up.railway.app/v1/`) | Address of the review service for languages with *Translation review* on. Empty turns review off for every language. Only change it when Supertext gives you another address. The `SUPERTEXT_REVIEW_URL` environment variable wins. |
 | Status of new translations | Unpublished | Unpublished lets an editor review translations first; or Published |
 | Translate custom fields | Yes | Translate Text, Textarea and Editor custom fields; other custom fields are copied unchanged |
 | Send version information to Supertext | Yes | Site URL and versions to Supertext after saving and after updates (see [Version information and the API key check](#version-information-and-the-api-key-check)). The `SUPERTEXT_VERSION_REPORTS` environment variable (`0`/`1`) wins. |
-| Languages (tab) | Suggested code per language | Per content language: its Supertext language (a list, preselected with the suggested code; *— choose —* where there is none, see [Supertext languages and tone](#supertext-languages-and-tone)) and tone |
+| Languages (tab) | Suggested code per language | Per content language: its Supertext language (a list, preselected with the suggested code; *— choose —* where there is none, see [Supertext languages and tone](#supertext-languages-and-tone)), tone and *Translation review* (off; see [Translation review](#translation-review)) |
 | Timeout (Advanced) | 180 s | Maximum wait for one translation |
 | Status check interval (Advanced) | 2 s | Time between status checks |
 
 ## Updating
 
-Install the new package over the old one (*System → Install → Extensions*, or `extension:install`). Settings are kept. The next back-end page of the plugin reports the update to Supertext (if *Send version information* is on).
+Install the new package over the old one (*System → Install → Extensions*, or `extension:install`). Settings are kept; *Translation review* starts off for every language. The next back-end page of the plugin reports the update to Supertext (if *Send version information* is on).
 
 **Updating from 0.1.0:** the *Languages* tab is now one row per content language with a list instead of rows you add yourself. The Supertext languages and tones you set before are kept: each row shows your saved choice, and the next *Save* stores it in the new form. Languages without a saved choice now use the suggested code (e.g. `es-ES` → `es`, `zh-CN` → `zh-Hans`, `de` → `de-DE`) instead of failing; only languages without a suggestion still need a choice. A saved code that isn't on Supertext's list is shown as *— choose —*: choose the right one.
 
@@ -184,6 +200,8 @@ Install the new package over the old one (*System → Install → Extensions*, o
 | *Timed out waiting* | Very long articles: raise the *Timeout* (and PHP's `max_execution_time`). |
 | *Could not reach Supertext* | The server can't make outbound HTTPS calls; check the firewall or proxy (*Global Configuration → Server → Proxy*). |
 | *The file is too large (at most 10 MB)* on import | The file is larger than 10 MB, or than PHP's `upload_max_filesize`/`post_max_size`. |
+| *Authentication failed* only for languages with *Translation review* | The review service only works with keys of the live Supertext API: with the *Staging*/*Testing* environment or a *Custom API base URL*, switch review off. |
+| Reviewers' corrections don't show up in Joomla | They arrive with the next translation: translate the articles into that language again with *Overwrite existing translations*. Check that the language's *Translation review* is on. |
 | No **Supertext** button | The plugin is disabled, you're on a new, unsaved article, or the user can't manage articles. |
 
 ## Security notes

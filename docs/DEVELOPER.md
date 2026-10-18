@@ -25,9 +25,9 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 
 | Class / file | Responsibility |
 | --- | --- |
-| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`, `export`, `import`; on the site: the ping), `onAfterInitialise` (answers the ping before routing), `onExtensionBeforeSave` (keeps the locked API key), `onExtensionAfterSave` (key check and report after saving the settings), `onPageCacheIsExcluded` (no page cache for the ping) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables, and the Commando Center glue (`reporting()`). |
+| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`, `export`, `import`; on the site: the ping), `onAfterInitialise` (answers the ping before routing), `onExtensionBeforeSave` (keeps the locked API key), `onExtensionAfterSave` (key check and report after saving the settings), `onPageCacheIsExcluded` (no page cache for the ping) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` / `SUPERTEXT_REVIEW_URL` environment variables, and the Commando Center glue (`reporting()`). |
 | `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
-| `Api\SupertextClient` | Wrapper around the bundled Supertext SDK (`src/Sdk`): documents below 900k characters, protocol, retries; maps SDK error codes to reasons. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests; `Api\CallableTransport`). |
+| `Api\SupertextClient` | Wrapper around the bundled Supertext SDK (`src/Sdk`): documents below 900k characters, protocol, retries; maps SDK error codes to reasons; `forReview()` for languages with *Translation review*. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests; `Api\CallableTransport`). |
 | `Sdk\…` | Bundled copy of the Supertext PHP SDK, namespace `Supertext\Plugin\System\Supertext\Sdk` (see *Supertext SDK*). Never edit. |
 | `PluginHealth\…` | Bundled copy of Supertext Plugin Health (PHP), namespace `Supertext\Plugin\System\Supertext\PluginHealth` (see *Supertext Plugin Health*). Never edit. |
 | `Api\Languages` | Content language → Supertext code with the SDK's `V1\Languages` (the Languages tab's choice, else an exact Supertext code, else the SDK's default, else `unsupported_language`), the source, the tone check (`unsupported_feature`), reading the saved tab (`settings()`, also the 0.1.0 rows) and validating it for saving (`clean()`); no Joomla dependency. |
@@ -87,6 +87,12 @@ Auth header: `Authorization: Supertext-Auth-Key <key>`. The header name must be 
 **Rate limit:** the API limits requests per second per key (HTTP 429, `RATE_LIMIT_EXCEEDED`). The client retries a 429 up to 4 times, waiting for `Retry-After` if sent, otherwise 1, 2, 4 and 8 seconds plus jitter. Languages are translated one after another.
 
 **`translate="no"`** is respected by the API; the plugin uses it for Joomla plugin tags.
+
+User-Agent: `Joomla-Supertext-Translation/<version>` (the version from `plugin/supertext.xml`, as in the reports).
+
+### Translation review
+
+Per content language (`review` in the Languages tab's settings, `Field\LanguagemappingField`, off by default; settings saved before have none and read as off): `ArticleTranslator` takes `SupertextClient::forReview($settings[$tag]['review'])` for each target language, a second SDK client with the same key, transport, timeouts and User-Agent whose base URL is the setting `review_url` (`SUPERTEXT_REVIEW_URL` wins; never saved = `SupertextClient::REVIEW_URL`, the translation proxy of [Supertext Localization Review](https://github.com/Supertext/Localization-Review-Supertext-Translation)). It is created once per request. The SDK's `translateHtml` runs the whole round trip on one client, so a job is always collected (status, download, delete) with the client that submitted it. The proxy speaks the same API v1, forwards to the live Supertext API with the plugin's key, stores every segment per key and serves reviewers' corrections on the next upload, so nothing else changes in the plugin. `review_url` saved empty (or equal to the API URL) means `forReview()` always returns the direct client. The key check (*Test connection*, on saving), the version reports and the translation files (`Api\FileTransfer`, no API calls) never use the review service. Tests: `SupertextClientTest` (all four calls of a review language to the review URL, the other language directly, key check directly, empty URL or the API's own URL = off, the manifest's default is `REVIEW_URL`, the User-Agent's version) and `LanguagesTest` (`review` read, saved and off by default).
 
 The SDK builds the multipart body itself and passes it as a string with its boundary in `Content-Type`: `Joomla\Http`'s curl transport only sends arrays as multipart when you set the `Content-Type` yourself, and then curl adds no boundary.
 
@@ -169,7 +175,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, key check, segments, splitting), languages (mapping, defaults, settings migration, saving, tone), Commando Center glue (ReportingTest: setting, when it reports, state, ping, broken storage), translation files (FileTransferTest: reference, export keys and mapping, import rules, errors, size limit), plugin-tag protection and the language files
+composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, key check, segments, splitting, Translation review client, User-Agent), languages (mapping, defaults, settings migration, saving, tone), Commando Center glue (ReportingTest: setting, when it reports, state, ping, broken storage), translation files (FileTransferTest: reference, export keys and mapping, import rules, errors, size limit), plugin-tag protection and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 
@@ -207,7 +213,8 @@ The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with Eng
 | `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD` | Super User (the e-mail address is also the username) |
 | `DEMO_EDITOR_EMAIL`, `DEMO_EDITOR_PASSWORD` | Optional second account for automated tests and screenshots. Joomla's *Editor* group has no backend access, so this account is a **Manager** (backend, articles, no system settings). |
 | `SUPERTEXT_API_KEY` | Supertext key used by the plugin (wins over the plugin setting) |
-| `SUPERTEXT_API_ENDPOINT` | Optional, e.g. the staging API |
+| `SUPERTEXT_API_ENDPOINT` | Optional, e.g. the staging API (to try the review service, switch on *Translation review* on the Languages tab instead) |
+| `SUPERTEXT_REVIEW_URL` | Optional: another review service than Supertext's (wins over the *Review service URL* setting; empty keeps the setting) |
 | `SUPERTEXT_VERSION_REPORTS` | Optional: `0` sends no version information to Supertext (wins over the plugin setting) |
 | `JOOMLA_SITE_NAME`, `JOOMLA_DB_NAME`, `JOOMLA_DB_PREFIX` | Optional, first boot only |
 | `PORT` | Port Apache listens on (Railway sets it; the domain's target port must match) |
@@ -277,6 +284,7 @@ The release attaches `plg_system_supertext-X.Y.Z.zip`, built by `./build.sh`.
 - Articles only. Categories, menu items, modules and custom field labels are not translated yet.
 - Without PHP-FPM (e.g. mod_php), a due version report or key check runs at the end of the request, so that one response waits for it (at most 3 s for the report, 10 s for the check); it happens only after updates or a changed key.
 - The *Supertext language* list is the SDK's (October 2026): a language Supertext adds later can be chosen once the bundled SDK is updated.
+- Re-translating overwrites manual changes; no change detection. A translation memory and reviewers' corrections come from the review service when a language has *Translation review* on; corrections reach Joomla only with the next translation (no push).
 - Translation runs inside the request (up to the timeout per language). Planned: a queue via Joomla's Task Scheduler for many articles.
 - Not yet tested on Joomla 5.4, or on MySQL/MariaDB (developed and tested on PostgreSQL).
 - Subform and repeatable custom fields are copied, not translated.
