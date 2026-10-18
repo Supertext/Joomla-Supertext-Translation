@@ -9,6 +9,7 @@ Select articles, click **Supertext**, tick the languages and click **Translate**
 - Leaves plugin tags such as `{loadmodule …}` untouched
 - Overwrites existing translations only when you ask for it, with a clear warning first
 - The Supertext language per content language from a list, with a suggested code preselected (no guessed regions), and formal or informal tone
+- Export for translation (XLIFF 1.2 or HTML) for translation tools, translators or Supertext's web app, and import of the translated file
 - Also available on the command line: `php cli/joomla.php supertext:translate`
 
 ![The Supertext dialog in the Joomla Articles list](docs/images/translate-dialog.png)

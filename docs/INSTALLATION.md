@@ -132,6 +132,10 @@ The plugin keeps what it reported last and the latest key check in its own row o
 
 Anyone who can **edit** the source article can open the Supertext dialog. Creating a translation also needs **Create** permission in the category the translation goes into; updating an existing translation needs **Edit** (or *Edit Own*) on it. These are Joomla's normal article permissions (*Content → Articles → Options → Permissions*, or per category).
 
+### Export for translation and import
+
+*Export for translation* and *Import translation* (tabs in the Supertext dialog, see the [user guide](USER_GUIDE.md#export-for-translation-and-import-the-translated-file)) need nothing to configure and no API key: they never call the Supertext API. They use the same permissions as translating: exporting needs **Edit** on the article; importing needs **Edit** on the source article named in the file, plus **Create** in the target category or **Edit** on the existing translation. Uploads are limited to **10 MB** by the plugin; PHP's `upload_max_filesize` and `post_max_size` must allow that much (a smaller PHP limit gives *The file is too large*, or *invalid token* when the whole request exceeds `post_max_size`). Uploaded files are read in memory and never stored on the server.
+
 ## Interface languages
 
 The plugin's dialog, settings and messages are available in English, German (`de-DE` and `de-CH`), French (`fr-FR`) and Italian (`it-IT`). They follow each user's backend language: install the Joomla language pack (*System → Install → Languages*), then choose the language under *Users → Manage → (user) → Basic Settings → Backend Language*, or set the default under *System → Languages* (Administrator). Other backend languages show the English texts.
@@ -179,6 +183,7 @@ Install the new package over the old one (*System → Install → Extensions*, o
 | *Your Supertext translation limit is exceeded* | Your Supertext plan's volume is used up. |
 | *Timed out waiting* | Very long articles: raise the *Timeout* (and PHP's `max_execution_time`). |
 | *Could not reach Supertext* | The server can't make outbound HTTPS calls; check the firewall or proxy (*Global Configuration → Server → Proxy*). |
+| *The file is too large (at most 10 MB)* on import | The file is larger than 10 MB, or than PHP's `upload_max_filesize`/`post_max_size`. |
 | No **Supertext** button | The plugin is disabled, you're on a new, unsaved article, or the user can't manage articles. |
 
 ## Security notes

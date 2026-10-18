@@ -11,6 +11,7 @@ namespace Supertext\Plugin\System\Supertext\Service;
 \defined('_JEXEC') or die;
 
 use Joomla\CMS\Language\Language;
+use Supertext\Plugin\System\Supertext\Api\FileTransferException;
 use Supertext\Plugin\System\Supertext\Api\SupertextException;
 use Supertext\Plugin\System\Supertext\PluginHealth\KeyCheck;
 
@@ -34,6 +35,12 @@ final class Messages
 
     public static function of(\Throwable $e, Language $language): string
     {
+        if ($e instanceof FileTransferException) {
+            $key = 'PLG_SYSTEM_SUPERTEXT_FILE_' . strtoupper($e->reason);
+
+            return $language->hasKey($key) ? sprintf($language->_($key), ...$e->args) : $e->getMessage();
+        }
+
         if (!$e instanceof SupertextException || $e->reason === '') {
             return $e->getMessage();
         }

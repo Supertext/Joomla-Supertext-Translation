@@ -23,3 +23,5 @@
 .supertext-dialog .form-check { margin-bottom: .35rem; }
 .supertext-dialog .badge { margin-inline-start: .35rem; font-weight: 500; }
 .supertext-dialog .supertext-results li { margin-bottom: .4rem; }
+.supertext-dialog .supertext-tabs { flex-wrap: wrap; }
+.supertext-dialog .supertext-results ul { margin: .25rem 0 0; padding-inline-start: 1.5rem; }

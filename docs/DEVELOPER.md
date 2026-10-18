@@ -15,6 +15,7 @@ Articles list / article editor                  php cli/joomla.php supertext:tra
         ▼                                                  ▼
 Extension\Supertext::handleAjax ──► Service\ArticleTranslator
    describe | translate | test         │ collects fields, one HTML document per article + language
+   export | import (files)             │   (export/import: Api\FileTransfer, the SDK's TranslationFiles, no API call)
                                        │ Api\SupertextClient (bundled Supertext SDK):
                                        │   <div data-st-id="N"> per field, POST file → poll → GET → DELETE
                                        ▼
@@ -24,7 +25,7 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 
 | Class / file | Responsibility |
 | --- | --- |
-| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`; on the site: the ping), `onAfterInitialise` (answers the ping before routing), `onExtensionBeforeSave` (keeps the locked API key), `onExtensionAfterSave` (key check and report after saving the settings), `onPageCacheIsExcluded` (no page cache for the ping) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables, and the Commando Center glue (`reporting()`). |
+| `Extension\Supertext` | Subscribes to `onAfterDispatch` (adds the toolbar button, script options and assets in `com_content` list and edit views), `onAjaxSupertext` (the endpoint: `describe`, `translate`, `test`, `export`, `import`; on the site: the ping), `onAfterInitialise` (answers the ping before routing), `onExtensionBeforeSave` (keeps the locked API key), `onExtensionAfterSave` (key check and report after saving the settings), `onPageCacheIsExcluded` (no page cache for the ping) and `application.before_execute` (registers the CLI command). Builds the client from the plugin params and the `SUPERTEXT_API_KEY` / `SUPERTEXT_API_ENDPOINT` environment variables, and the Commando Center glue (`reporting()`). |
 | `Service\ArticleTranslator` | Permission checks, which languages exist and are already translated (from `#__associations`), field collection, writing through the admin `ArticleModel` so versions, workflow, tags, custom fields and associations behave like a manual save. |
 | `Api\SupertextClient` | Wrapper around the bundled Supertext SDK (`src/Sdk`): documents below 900k characters, protocol, retries; maps SDK error codes to reasons. No Joomla dependency: HTTP goes through a transport callable (`Joomla\Http` in production, a fake in tests; `Api\CallableTransport`). |
 | `Sdk\…` | Bundled copy of the Supertext PHP SDK, namespace `Supertext\Plugin\System\Supertext\Sdk` (see *Supertext SDK*). Never edit. |
@@ -32,6 +33,7 @@ Extension\Supertext::handleAjax ──► Service\ArticleTranslator
 | `Api\Languages` | Content language → Supertext code with the SDK's `V1\Languages` (the Languages tab's choice, else an exact Supertext code, else the SDK's default, else `unsupported_language`), the source, the tone check (`unsupported_feature`), reading the saved tab (`settings()`, also the 0.1.0 rows) and validating it for saving (`clean()`); no Joomla dependency. |
 | `Api\Reporting`, `Api\StateStorage`, `Api\ReportTransport` | Commando Center: version reports, the API key check and the ping answer, on Supertext Plugin Health's `InstallationReporter` with the SDK's key check; never throws. No Joomla dependency. |
 | `Service\ExtensionStateStorage` | Keeps the reporter's state (JSON) and the last site URL in the plugin's `#__extensions.custom_data`. |
+| `Api\FileTransfer`, `Api\FileTransferException` | *Export for translation* / *Import translation* on the SDK's `Files\TranslationFiles` (see *Translation files*); no Joomla dependency. |
 | `Api\HtmlDocument` | Wraps Joomla plugin tags (`{loadmodule …}`) in `<span translate="no">` and unwraps them afterwards. |
 | `Field\ConnectionField` | *API key check* in the plugin settings: the latest check with its time and the *Test connection* button; schedules the back-end report check. |
 | `Field\ReportingField` | Under *Send version information to Supertext*: what is sent, a `SUPERTEXT_VERSION_REPORTS` override, the ping address. |
@@ -60,6 +62,17 @@ Each field is one `<div data-st-id>`. The live API translates every such element
 
 `ArticleModel::save()` with `data['associations'] = [tag => id, …]` (source plus existing translations, minus the target) re-links all of them under one association key. When the dialog runs in the article editor, `supertext.js` also writes the new IDs into the editor's *Associations* fields (`#jform_associations_<tag>_id`), because saving the source article afterwards would otherwise post the old associations and unlink the new translations.
 
+### Translation files (export for translation, import)
+
+The dialog's tabs *Export for translation* and *Import translation* use the SDK's `Files\TranslationFiles` (SDK 0.5.0; XLIFF 1.2 and HTML, outside `V1`, no API call). The glue is `Api\FileTransfer` (no Joomla classes, unit-tested in `tests/FileTransferTest.php`); `ArticleTranslator` gives it the segments and the write-back:
+
+- **Segments:** `ArticleTranslator::collect()`, the same collector as for API translations (keys `article.title`, `article.introtext`, `images.image_intro_alt`, `urls.urlatext`, `field.<name>` …, plugin tags protected), with blank fields left out the same way (`FileTransfer::segments()`). So an import reuses the write-back (`ArticleTranslator::save()`).
+- **Job metadata:** `plugin` = `Joomla-Supertext-Translation`; `reference` = `article:<source article id>:<target content language tag>`, e.g. `article:12:fr-FR` (`FileTransfer::reference()`/`parseReference()`); `sourceLanguage`/`targetLanguage` = the codes `Api\Languages` resolves with the Languages tab's mapping, else the tag itself (`_` → `-`), so an unmapped language never blocks an export.
+- **Export** (`action=export`, POST `id`, `targets[]`, `format=xliff|html`): XLIFF with one `<file>` per target language, or HTML for exactly one. `Extension\Supertext::sendExport()` answers with the file itself (`Content-Disposition: attachment`, `application/x-xliff+xml` or `text/html; charset=utf-8`, named `joomla-<id>-<tag>.xlf`, `joomla-<id>.xlf` for several languages, `.html`), bypassing com_ajax's JSON; errors come back as com_ajax JSON. `supertext.js` downloads it through a blob URL.
+- **Import** (`action=import`, multipart `file`, `include_changed`, `overwrite`): `importUpload()` refuses files over 10 MB (`FileTransfer::MAX_UPLOAD_BYTES`, also PHP's `UPLOAD_ERR_INI_SIZE`) before reading, reads the temporary upload in memory (never stored), then `FileTransfer::import()`: `TranslationFiles::read()`, and per job: `plugin` must be ours (`other_system`), the reference must parse (`not_found`), the article must exist (`not_found`) and the language must be a content language other than the article's (`no_language`); the user needs the same permissions as for translating (`assertCanRead()`, then `prepareTarget()`: Create in the category or Edit on the translation). `importTranslations()` with the freshly collected segments; `ok` (and `source_changed` with *Also import texts whose source changed*) are written, `untranslated`, `invalid_markup`, `missing` never. The write-back is `ArticleTranslator::save()` with `$keepTarget`: an existing translation is only replaced with *Overwrite existing translations* (else `skipped`), and keeps its own values for keys the file doesn't translate (custom fields not in `com_fields` are left alone by Joomla); a new one is created unpublished (setting) like an API translation.
+- **Summary:** per job `counts` (`imported`, `changed`, `untranslated`, `invalid`, `missing`), `saved` (`created`/`updated`/`skipped`, id, title) or `message`. Errors are `FileTransferException` reasons shown as `PLG_SYSTEM_SUPERTEXT_FILE_<REASON>` (`Service\Messages`).
+- Not covered by the CI job (it would need a backend login); `tests/docs/screenshots.mjs` runs an HTML export → translate → import round trip against a real Joomla.
+
 ## Supertext API protocol
 
 Shared with every Supertext plugin. Every call goes through the Supertext SDK (see *Supertext SDK*); this is what it does:
@@ -79,7 +92,7 @@ The SDK builds the multipart body itself and passes it as a string with its boun
 
 ### Supertext SDK
 
-The protocol, the retries, the language list, the API key check (`Client::checkApiKey()`, `Protocol::apiKeyFingerprint()`) and the `data-st-id` document come from the official Supertext PHP SDK ([Supertext/Supertext-API-SDK-and-Guide](https://github.com/Supertext/Supertext-API-SDK-and-Guide), MIT; 0.4.0): it provides the client and the key check. The version reports are no longer in the SDK (since 0.3.0) but in *Supertext Plugin Health* (below). The plugin ships a copy in `plugin/src/Sdk/` with its namespace changed from `Supertext\Sdk` to `Supertext\Plugin\System\Supertext\Sdk`, so Joomla's autoloader for the plugin (`<namespace path="src">`) loads it, sites install nothing extra and another extension that ships the SDK itself can't clash with it. Everything that talks to the API is in its `V1` namespace (`Sdk\V1\Client`, `Languages`, `ApiKeyCheck`, …); only the HTTP transport (`Sdk\Http`) and `Sdk\Supertext::SDK_VERSION` are outside. `plugin/src/Sdk/COMMIT` names the SDK revision.
+The protocol, the retries, the language list, the API key check (`Client::checkApiKey()`, `Protocol::apiKeyFingerprint()`) and the `data-st-id` document come from the official Supertext PHP SDK ([Supertext/Supertext-API-SDK-and-Guide](https://github.com/Supertext/Supertext-API-SDK-and-Guide), MIT; 0.5.0): it provides the client, the key check and the translation files (`Sdk\Files`, see *Translation files*). The version reports are no longer in the SDK (since 0.3.0) but in *Supertext Plugin Health* (below). The plugin ships a copy in `plugin/src/Sdk/` with its namespace changed from `Supertext\Sdk` to `Supertext\Plugin\System\Supertext\Sdk`, so Joomla's autoloader for the plugin (`<namespace path="src">`) loads it, sites install nothing extra and another extension that ships the SDK itself can't clash with it. Everything that talks to the API is in its `V1` namespace (`Sdk\V1\Client`, `Languages`, `ApiKeyCheck`, …); only the HTTP transport (`Sdk\Http`), the translation files (`Sdk\Files`) and `Sdk\Supertext::SDK_VERSION` are outside. `scripts/vendor-sdk.sh` rewrites the namespace in every file of the copy, `Files\` included. `plugin/src/Sdk/COMMIT` names the SDK revision.
 
 - Never edit `plugin/src/Sdk/`. Fix the SDK in its repository, then run `scripts/vendor-sdk.sh [ref]` (default `main`; `SDK_DIR=/path/to/clone` uses a local clone) and the tests.
 - `Api\SupertextClient` keeps the plugin's interface (`translateDocument`, `translateSegments`, `validateApiKey`, `checkApiKey`, transport callable) and turns every SDK error code into a `SupertextException` reason (`REASONS`, `fromSdk()`). A new SDK error code needs a reason there and its `PLG_SYSTEM_SUPERTEXT_API_<REASON>` string in all five language files.
@@ -156,7 +169,7 @@ To work without a real key, run the stand-in API (`cd tests/docs && node stand-i
 
 ```bash
 composer install
-composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, key check, segments, splitting), languages (mapping, defaults, settings migration, saving, tone), Commando Center glue (ReportingTest: setting, when it reports, state, ping, broken storage), plugin-tag protection and the language files
+composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retries, errors, key check, segments, splitting), languages (mapping, defaults, settings migration, saving, tone), Commando Center glue (ReportingTest: setting, when it reports, state, ping, broken storage), translation files (FileTransferTest: reference, export keys and mapping, import rules, errors, size limit), plugin-tag protection and the language files
 ./build.sh             # dist/plg_system_supertext-<version>.zip
 ```
 
@@ -227,7 +240,7 @@ BASE_URL=http://127.0.0.1:8092 DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… \
   DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… npm run screenshots
 ```
 
-Start from a database without translations of the sample articles. The script saves the settings twice (the key, then on the Languages tab `fr-FR` → `fr-CH`, formal) and shows the ping address with the public demo's URL (`PUBLIC_URL`) instead of the local one.
+Start from a database without translations of the sample articles. The script also exports the second sample article as HTML, fills in the French sample translations and imports the file (`export-dialog`, `import-dialog`, `import-summary`). The script saves the settings twice (the key, then on the Languages tab `fr-FR` → `fr-CH`, formal) and shows the ping address with the public demo's URL (`PUBLIC_URL`) instead of the local one.
 
 ## Code quality and security checks
 

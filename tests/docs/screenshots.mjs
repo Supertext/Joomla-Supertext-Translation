@@ -12,6 +12,9 @@
  * so saving the settings reports to the stand-in, not to Supertext's Commando Center.
  */
 import { chromium } from 'playwright'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const B = process.env.BASE_URL || 'http://127.0.0.1:8092'
 const PUBLIC = process.env.PUBLIC_URL || 'https://joomla-production-096c.up.railway.app'
@@ -133,6 +136,42 @@ async function session(email, password) {
   await page.locator('.supertext-dialog header [data-close]').click()
   await page.locator('joomla-toolbar-button button', { hasText: /^\s*Close\s*$/ }).click()
   await page.waitForLoadState('networkidle')
+
+  // Export for translation / import translation, with the second sample article
+  await go('/administrator/index.php?option=com_content&view=articles&filter[language]=&list[fullordering]=a.id ASC')
+  await page.locator('tr', { hasText: 'Opening hours and contact' }).locator('input[name="cid[]"]').check()
+  await page.locator('.supertext-open').click()
+  await page.locator('.supertext-dialog [data-tab="export"]').click()
+  await page.locator('#st-x-fr-FR').check()
+  await shot('export-dialog', await box('.supertext-dialog'))
+
+  // Download the French HTML file and translate it the way a translator would (samples.json: real Supertext output).
+  await page.locator('#st-format-html').check()
+  await page.locator('#st-x-fr-FR').check()
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.supertext-dialog [data-go]').click()])
+  const exported = readFileSync(await download.path(), 'utf8')
+  const french = JSON.parse(readFileSync(new URL('samples.json', import.meta.url), 'utf8')).fr
+  const norm = (s) => s.replace(/\s+/g, ' ').trim()
+  const known = new Map(Object.entries(french).map(([source, target]) => [norm(source), target]))
+  const unescape = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+  let translatedSegments = 0
+  const translatedFile = exported.replace(/(<(\w+)[^>]*\bdata-st-id="[^"]*"[^>]*>)([\s\S]*?)(<\/\2>)/g, (all, open, tag, inner, close) => {
+    const target = known.get(norm(inner)) ?? known.get(norm(unescape(inner)))
+    if (target === undefined) return all
+    translatedSegments++
+    return open + (/<[a-z]/i.test(inner) ? target : target.replace(/&/g, '&amp;').replace(/</g, '&lt;')) + close
+  })
+  if (translatedSegments === 0) throw new Error('no sample translation matched the exported file')
+  const upload = join(mkdtempSync(join(tmpdir(), 'supertext-')), download.suggestedFilename())
+  writeFileSync(upload, translatedFile)
+
+  await page.locator('.supertext-dialog [data-tab="import"]').click()
+  await page.locator('#st-file').setInputFiles(upload)
+  await shot('import-dialog', await box('.supertext-dialog'))
+  await page.locator('.supertext-dialog [data-go]').click()
+  await page.locator('.supertext-results').waitFor({ timeout: 60000 })
+  await shot('import-summary', await box('.supertext-dialog'))
+  await page.locator('.supertext-dialog header [data-close]').click()
 }
 
 await browser.close()
