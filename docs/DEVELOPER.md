@@ -148,8 +148,8 @@ You need PHP 8.3, Composer and a database (Joomla doesn't support SQLite; Postgr
 
 ```bash
 # Joomla
-curl -LO https://github.com/joomla/joomla-cms/releases/download/6.1.4/Joomla_6.1.4-Stable-Full_Package.zip
-mkdir site && cd site && unzip -q ../Joomla_6.1.4-Stable-Full_Package.zip
+curl -LO https://github.com/joomla/joomla-cms/releases/download/6.2.0/Joomla_6.2.0-Stable-Full_Package.zip
+mkdir site && cd site && unzip -q ../Joomla_6.2.0-Stable-Full_Package.zip
 php installation/joomla.php install -n --site-name="Dev" --admin-user="Dev" --admin-username=dev \
   --admin-password='choose-a-long-one' --admin-email=dev@example.com \
   --db-type=pgsql --db-host=127.0.0.1:5432 --db-user=postgres --db-pass=… --db-name=joomla --db-prefix=jos_
@@ -181,13 +181,13 @@ composer test          # PHPUnit: SDK wrapper (protocol, auth header, 429 retrie
 
 CI (`.github/workflows/ci.yml`) on every push and pull request:
 
-- **unit**: PHP lint on 8.2, 8.3 and 8.4, PHPUnit, `sh -n demo/entrypoint.sh`, package build.
+- **unit**: PHP lint on 8.2, 8.3, 8.4 and 8.5, PHPUnit, `sh -n demo/entrypoint.sh`, package build.
 - **PHPStan**: level 5 against a downloaded Joomla (see *Code quality and security checks*).
-- **joomla**: installs Joomla 6.1 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database. The stand-in also plays the Commando Center (`SUPERTEXT_REPORT_URL`): the job checks the one `installed` report (plugin, Joomla version, callback URL, no key) and the public ping through `php -S` on a site with the Language Filter on.
+- **joomla**: installs Joomla 6.2 on PostgreSQL, installs the built package and the demo setup plugin, runs `supertext:demo-setup`, then translates the sample articles with `supertext:translate` against the stand-in API and checks the German article and its association in the database. The stand-in also plays the Commando Center (`SUPERTEXT_REPORT_URL`): the job checks the one `installed` report (plugin, Joomla version, callback URL, no key) and the public ping through `php -S` on a site with the Language Filter on.
 
 ## Demo (Railway)
 
-The public demo is a container built from `demo/Dockerfile`: Joomla 6.1 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production-096c.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
+The public demo is a container built from `demo/Dockerfile`: Joomla 6.2 with English, German (Switzerland), French and Italian, two English sample articles, and this plugin. It runs on Railway in the `supertext-cms-demos` project, service `Joomla`, region EU West (Amsterdam): <https://joomla-production-096c.up.railway.app/> (backend: `/administrator/`). The database is a `joomla` database on the project's PostgreSQL service.
 
 **Deploys:** Railway watches `main` of this repository (`railway.json` points it at `demo/Dockerfile`) and rebuilds on every push.
 

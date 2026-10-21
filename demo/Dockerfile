@@ -1,4 +1,4 @@
-# Supertext Joomla demo: Joomla 6.1 + German (CH), French and Italian + this plugin.
+# Supertext Joomla demo: Joomla 6.2 + German (CH), French and Italian + this plugin.
 # Build context is the repository root:
 #   docker build -f demo/Dockerfile -t supertext-joomla-demo .
 # Everything persistent is in PostgreSQL (DATABASE_URL), including configuration.php;
@@ -6,7 +6,7 @@
 
 FROM php:8.3-apache
 
-ARG JOOMLA_VERSION=6.1.4
+ARG JOOMLA_VERSION=6.2.0
 ARG JOOMLA_LANGUAGES="de-CH fr-FR it-IT"
 
 RUN apt-get update \

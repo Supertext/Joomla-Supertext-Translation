@@ -4,13 +4,13 @@ For administrators setting up the plugin on a Joomla site.
 
 ## Just want to try it?
 
-A ready-to-run container with Joomla 6.1, English sample articles, German (Switzerland), French and Italian, and this plugin is in `demo/`. It is also what runs the public Supertext demo. See the *Demo* section of the [developer guide](DEVELOPER.md#demo-railway).
+A ready-to-run container with Joomla 6.2, English sample articles, German (Switzerland), French and Italian, and this plugin is in `demo/`. It is also what runs the public Supertext demo. See the *Demo* section of the [developer guide](DEVELOPER.md#demo-railway).
 
 ## Requirements
 
 | | |
 | --- | --- |
-| Joomla | 6.1 (tested), 5.4 (supported, not yet tested) |
+| Joomla | 6.2 and 6.1 (tested), 5.4 (supported, not yet tested) |
 | PHP | Whatever your Joomla version needs (8.3+ for Joomla 6), with `ext-dom` and `ext-curl` (or `allow_url_fopen`) |
 | Database | Any database Joomla supports (MySQL, MariaDB, PostgreSQL) |
 | Joomla setup | A multilingual site: at least two content languages and *Item Associations* switched on (step 3) |
